@@ -578,6 +578,13 @@ const char *xraudio_capabilities_input_str(uint16_t type) {
          strlcat(str, "LOCAL_32_BIT", sizeof(str));
       }
    }
+   if(type & XRAUDIO_CAPS_INPUT_EOS_DETECTION) {
+      if(str[0] != '\0') {
+         strlcat(str, ", EOS", sizeof(str));
+      } else {
+         strlcat(str, "EOS", sizeof(str));
+      }
+   }
 
    if(str[0] != '\0') {
       return(str);

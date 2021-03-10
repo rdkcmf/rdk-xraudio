@@ -209,6 +209,7 @@ typedef struct {
    xraudio_input_format_t          format;
    uint8_t                         pcm_bit_qty;
    xraudio_devices_input_t         devices_input;
+   uint16_t                        capabilities;
 } xraudio_queue_msg_idle_start_t;
 
 typedef struct {

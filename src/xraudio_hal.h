@@ -25,6 +25,7 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include "xraudio_common.h"
+#include "xraudio_eos.h"
 #include "xraudio_version.h"
 
 /// @file xraudio_hal.h
@@ -49,6 +50,12 @@ typedef enum {
    XRAUDIO_SDF_MODE_STRONGEST_SECTOR  = 2,
    XRAUDIO_SDF_MODE_INVALID           = 3,
 } xraudio_sdf_mode_t;
+
+typedef enum {
+   XRAUDIO_EOS_CMD_SESSION_BEGIN     = 0,
+   XRAUDIO_EOS_CMD_SESSION_TERMINATE = 1,
+   XRAUDIO_EOS_CMD_INVALID           = 2,
+} xraudio_eos_cmd_t;
 
 typedef void * xraudio_hal_obj_t;
 
@@ -84,6 +91,7 @@ typedef enum {
 #define XRAUDIO_CAPS_INPUT_FF               (0x0004) // Source is from FF remote
 #define XRAUDIO_CAPS_INPUT_SELECT           (0x0008) // Supports calling select on input fd
 #define XRAUDIO_CAPS_INPUT_LOCAL_32_BIT     (0x0010) // Source is from local microphone in 32-bit PCM format
+#define XRAUDIO_CAPS_INPUT_EOS_DETECTION    (0x0020) // Source supports EOS detection
 
 // Output capabilities
 #define XRAUDIO_CAPS_OUTPUT_NONE                    (0x0000)      // default PCM processing within xraudio
@@ -177,11 +185,12 @@ typedef void * xraudio_hal_output_obj_t;
 xraudio_hal_input_obj_t  xraudio_hal_input_open(xraudio_hal_obj_t hal_obj, xraudio_devices_input_t device, xraudio_input_format_t format, xraudio_device_input_configuration_t *configuration);
 void                     xraudio_hal_input_close(xraudio_hal_input_obj_t obj);
 uint32_t                 xraudio_hal_input_buffer_size_get(xraudio_hal_input_obj_t obj);
-int32_t                  xraudio_hal_input_read(xraudio_hal_input_obj_t obj, uint8_t *data, uint32_t size);
+int32_t                  xraudio_hal_input_read(xraudio_hal_input_obj_t obj, uint8_t *data, uint32_t size, xraudio_eos_event_t *eos_event);
 bool                     xraudio_hal_input_mute(xraudio_hal_input_obj_t obj, xraudio_devices_input_t device, bool enable);
 bool                     xraudio_hal_input_focus(xraudio_hal_input_obj_t obj, xraudio_sdf_mode_t mode);
 bool                     xraudio_hal_input_stats(xraudio_hal_input_obj_t obj, xraudio_hal_input_stats_t *input_stats, bool reset);
 bool                     xraudio_hal_input_detection(xraudio_hal_input_obj_t obj, uint32_t chan, bool *ignore);
+bool                     xraudio_hal_input_eos_cmd(xraudio_hal_input_obj_t obj, xraudio_eos_cmd_t cmd, uint32_t chan);
 
 xraudio_hal_output_obj_t xraudio_hal_output_open(xraudio_hal_obj_t hal_obj, xraudio_devices_output_t device, xraudio_resource_id_output_t resource, uint8_t user_id, xraudio_output_format_t *format, xraudio_volume_step_t left, xraudio_volume_step_t right);
 void                     xraudio_hal_output_close(xraudio_hal_output_obj_t obj, xraudio_devices_output_t device);

@@ -1282,6 +1282,7 @@ void xraudio_input_dispatch_idle_start(xraudio_input_obj_t *obj) {
    msg.format              = obj->format_in;
    msg.pcm_bit_qty         = obj->pcm_bit_qty;
    msg.devices_input       = obj->device;
+   msg.capabilities        = obj->capabilities;
 
    xraudio_input_queue_msg_push(obj, (const char *)&msg, sizeof(msg));
 }

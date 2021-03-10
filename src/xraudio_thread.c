@@ -252,6 +252,8 @@ struct xraudio_session_record_t {
    xraudio_keyword_detector_t   keyword_detector;
    xraudio_devices_input_t      devices_input;
    xraudio_eos_event_t          eos_event;
+   bool                         use_hal_eos;
+   bool                         eos_hal_cmd_pending;
    rdkx_timestamp_t             timestamp_next;
    xraudio_capture_session_t    capture_session;
    xraudio_capture_internal_t   capture_internal;
@@ -592,6 +594,8 @@ void *xraudio_main_thread(void *param) {
 
    state.record.devices_input          = XRAUDIO_DEVICE_INPUT_NONE;
    state.record.eos_event              = XRAUDIO_EOS_EVENT_NONE;
+   state.record.use_hal_eos            = false;
+   state.record.eos_hal_cmd_pending    = false;
    state.record.timestamp_next         = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
    memset(state.record.frame_buffer_int16, 0, sizeof(state.record.frame_buffer_int16));
    memset(state.record.frame_buffer_fp32, 0, sizeof(state.record.frame_buffer_fp32));
@@ -851,6 +855,8 @@ void xraudio_msg_record_idle_start(xraudio_thread_state_t *state, void *msg) {
    state->record.format_in                 = idle_start->format;
    state->record.pcm_bit_qty               = idle_start->pcm_bit_qty;
    state->record.devices_input             = idle_start->devices_input;
+   state->record.use_hal_eos               = (idle_start->capabilities & XRAUDIO_CAPS_INPUT_EOS_DETECTION) ? true : false;
+   state->record.eos_hal_cmd_pending       = false;
    //XLOGD_INFO("record device = %s", xraudio_devices_input_str(state->record.devices_input));
 
    // Set timeout for next chunk (in microseconds)
@@ -1100,6 +1106,16 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
 
       state->record.internal_sample_qty_min      = record->stream_time_minimum * state->record.format_in.sample_rate / 1000;
       state->record.internal_keyword_end_samples = (record->stream_keyword_duration != 0) ? record->stream_keyword_begin + record->stream_keyword_duration : 0;
+
+      #ifdef XRAUDIO_KWD_ENABLED
+      if(record->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_SPEECH && state->record.use_hal_eos) {
+         if(!xraudio_hal_input_eos_cmd(state->params.hal_input_obj, XRAUDIO_EOS_CMD_SESSION_BEGIN, state->record.keyword_detector.active_chan)) {
+            XLOGD_ERROR("unable to begin hal eos session");
+         } else {
+            state->record.eos_hal_cmd_pending = true;
+         }
+      }
+      #endif
    }
 
    XLOGD_DEBUG("internal capture <%s>", (state->record.capture_internal.enabled ? "enabled" : "disabled"));
@@ -1191,6 +1207,15 @@ void xraudio_msg_record_stop(xraudio_thread_state_t *state, void *msg) {
    }
 
    if(!more_streams) {
+      #ifdef XRAUDIO_KWD_ENABLED
+      if(state->record.eos_hal_cmd_pending) { // an EOS command is pending with the HAL, so terminate the EOS session
+         if(!xraudio_hal_input_eos_cmd(state->params.hal_input_obj, XRAUDIO_EOS_CMD_SESSION_TERMINATE, state->record.keyword_detector.active_chan)) {
+            XLOGD_ERROR("unable to terminate hal eos session");
+         }
+         state->record.eos_hal_cmd_pending = false;
+      }
+      #endif
+
       state->record.source                    = XRAUDIO_DEVICE_INPUT_NONE;
       state->record.record_callback           = NULL;
 
@@ -1840,7 +1865,9 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    mic_frame_size = mic_frame_samples * sample_size;    // X channels * (20 msec @ 16kHz * (2 or 4 bytes per sample))  = 640*X bytes or 1280*X bytes per frane
    uint8_t mic_frame_data[mic_frame_size];
 
-   rc = xraudio_hal_input_read(params->hal_input_obj, mic_frame_data, mic_frame_size);
+   xraudio_eos_event_t eos_event_hal = XRAUDIO_EOS_EVENT_NONE;
+
+   rc = xraudio_hal_input_read(params->hal_input_obj, mic_frame_data, mic_frame_size, &eos_event_hal);
    //XLOGD_INFO("bytes read %d, bytes expected %u, frame size %u", rc, mic_frame_size, session->frame_size_in);
    if(rc != (int) mic_frame_size) {
       if(rc < 0) {
@@ -1891,24 +1918,32 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
          if(ppr_event != XRAUDIO_PPR_EVENT_NONE) {
             XLOGD_DEBUG("ppr event: %s", xraudio_ppr_event_str(ppr_event));
          }
+         xraudio_eos_event_t eos_event_ppr = XRAUDIO_EOS_EVENT_NONE;
          switch(ppr_event) {
-            #ifdef XRAUDIO_EOS_ENABLED
-            case XRAUDIO_PPR_EVENT_ENDOFSPEECH:
-            case XRAUDIO_PPR_EVENT_TIMEOUT_BEGIN:
-            case XRAUDIO_PPR_EVENT_TIMEOUT_END:
-            #else
-            case XRAUDIO_PPR_EVENT_ENDOFSPEECH:   event = AUDIO_IN_CALLBACK_EVENT_EOS; break;
-            case XRAUDIO_PPR_EVENT_TIMEOUT_BEGIN: event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_BEGIN; break;
-            case XRAUDIO_PPR_EVENT_TIMEOUT_END:   event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END; break;
-            #endif
+            case XRAUDIO_PPR_EVENT_ENDOFSPEECH:   eos_event_ppr = XRAUDIO_EOS_EVENT_ENDOFSPEECH; break;
+            case XRAUDIO_PPR_EVENT_TIMEOUT_BEGIN: eos_event_ppr = XRAUDIO_EOS_EVENT_TIMEOUT_BEGIN; break;
+            case XRAUDIO_PPR_EVENT_TIMEOUT_END:   eos_event_ppr = XRAUDIO_EOS_EVENT_TIMEOUT_END; break;
             case XRAUDIO_PPR_EVENT_NONE:
             case XRAUDIO_PPR_EVENT_STARTOFSPEECH:
             case XRAUDIO_PPR_EVENT_LOCAL_KEYWORD_DETECTED:
             case XRAUDIO_PPR_EVENT_REFERENCE_KEYWORD_DETECTED:
             case XRAUDIO_PPR_EVENT_INVALID:       break;
          }
+         #ifndef XRAUDIO_EOS_ENABLED
+         eos_event = eos_event_ppr;
          #endif
-         #ifdef XRAUDIO_EOS_ENABLED
+         #endif
+         if(session->use_hal_eos) {
+            if(eos_event_hal == XRAUDIO_EOS_EVENT_NONE) {
+               eos_event = XRAUDIO_EOS_EVENT_NONE;
+            } else if(!session->eos_hal_cmd_pending) {
+               XLOGD_ERROR("cmd not pending - hal eos event <%s>", xraudio_eos_event_str(eos_event_hal));
+               eos_event = XRAUDIO_EOS_EVENT_NONE;
+            } else {
+               eos_event                    = eos_event_hal; // when HAL supports EOS, use it instead of the ppr or eos subcomponents
+               session->eos_hal_cmd_pending = false;
+            }
+         }
          switch(eos_event) {
             case XRAUDIO_EOS_EVENT_ENDOFSPEECH:   event = AUDIO_IN_CALLBACK_EVENT_EOS; break;
             case XRAUDIO_EOS_EVENT_TIMEOUT_BEGIN: event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_BEGIN; break;
@@ -1917,7 +1952,6 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
             case XRAUDIO_EOS_EVENT_STARTOFSPEECH: 
             case XRAUDIO_EOS_EVENT_INVALID:       break;
          }
-         #endif
       }
       if(session->capture_session.active && session->capture_session.eos[chan].file.fh) {
          uint32_t sample_qty_chan = session->frame_sample_qty / session->format_in.channel_qty;
@@ -3167,7 +3201,7 @@ void *xraudio_thread_first_read(void *param) {
 
    mic_frame_size = (chan_qty_mic + chan_qty_ecref) * params.session->frame_size_in;  // normal frame @ 16kHz = 640 bytes. compressed frame @ 48kHz = 2560 bytes
 
-   xraudio_hal_input_read(params.params->hal_input_obj, mic_frame_data, mic_frame_size);
+   xraudio_hal_input_read(params.params->hal_input_obj, mic_frame_data, mic_frame_size, NULL);
 
    #if 0
    rdkx_timestamp_get(&finish);
@@ -3833,8 +3867,7 @@ bool xraudio_hal_msg_async_handler(void *msg) {
          ret = true;
          break;
       }
-      default: {
-         XLOGD_INFO("not implemented");
+      case XRAUDIO_MSG_TYPE_INVALID: {
          break;
       }
    }
@@ -3860,7 +3893,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             return;
             #else
             adpcm_t buffer[XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE] = {'\0'};
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
                if(session->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
@@ -3892,7 +3925,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             return;
             #else
             adpcm_t buffer[XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE] = {'\0'};
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
                if(session->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
@@ -3910,7 +3943,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             }
             #endif
          } else if(enc_output == XRAUDIO_ENCODING_ADPCM_XVP) {
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen, NULL);
             #ifdef XRAUDIO_DECODE_ADPCM
             if(bytes_read > 0) {
                adpcm_analyze(decoders->adpcm, inbuf, inlen, command_id_min, command_id_max);
@@ -3918,7 +3951,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             #endif
          } else if(enc_output == XRAUDIO_ENCODING_ADPCM) {
             // TODO should read header first from the HAL into a temp buffer and then the payload into inbuf
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen, NULL);
             if(bytes_read > 0) {
                bytes_read = adpcm_deframe(decoders->adpcm, inbuf, bytes_read, command_id_min, command_id_max);
             }
@@ -3939,7 +3972,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             return;
             #else
             uint8_t buffer[XRAUDIO_INPUT_OPUS_BUFFER_SIZE] = {'\0'};
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_OPUS_BUFFER_SIZE);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_OPUS_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
                if(session->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
@@ -3958,10 +3991,10 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             }
             #endif
          } else if(enc_output == XRAUDIO_ENCODING_OPUS_XVP) {
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen, NULL);
          } else if(enc_output == XRAUDIO_ENCODING_OPUS) {
             // TODO should read header first from the HAL into a temp buffer and then the payload into inbuf
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen, NULL);
             if(bytes_read > 0) {
                bytes_read = xraudio_opus_deframe(decoders->opus, inbuf, bytes_read);
             }
@@ -3978,7 +4011,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
                inbuf += session->external_frame_bytes_read;
                inlen  = session->external_frame_size_in - session->external_frame_bytes_read;
             }
-            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen);
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen, NULL);
             if(bytes_read <= 0) break;
             bytes_read += session->external_frame_bytes_read;
             session->external_frame_bytes_read = bytes_read;
