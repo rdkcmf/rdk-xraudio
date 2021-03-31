@@ -195,7 +195,8 @@ typedef struct {
 typedef enum {
    XRAUDIO_POWER_MODE_FULL    = 0, ///< Full power mode
    XRAUDIO_POWER_MODE_LOW     = 1, ///< Low power mode
-   XRAUDIO_POWER_MODE_INVALID = 2, ///< Invalid power mode type
+   XRAUDIO_POWER_MODE_SLEEP   = 2, ///< Lower power mode
+   XRAUDIO_POWER_MODE_INVALID = 3, ///< Invalid power mode type
 } xraudio_power_mode_t;
 
 /// @}

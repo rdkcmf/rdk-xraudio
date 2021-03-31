@@ -634,6 +634,7 @@ const char *xraudio_power_mode_str(xraudio_power_mode_t type) {
    switch(type) {
       case XRAUDIO_POWER_MODE_FULL:    return("FULL");
       case XRAUDIO_POWER_MODE_LOW:     return("LOW");
+      case XRAUDIO_POWER_MODE_SLEEP:   return("SLEEP");
       case XRAUDIO_POWER_MODE_INVALID: return("INVALID");
    }
    return(xraudio_invalid_return(type));
