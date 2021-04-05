@@ -135,6 +135,7 @@ typedef struct {
    uint32_t                          post_frame_count_trigger;  // count of audio frames since the first detector triggered
    uint32_t                          post_frame_count_callback; // count of audio frames since detection callback
    uint8_t                           active_chan;               // kwd active ("best") channel
+   xraudio_kwd_criterion_t           criterion;                 // kwd criterion for choosing active channel
    #endif
    keyword_callback_t                callback;
    void *                            cb_param;
@@ -2205,16 +2206,27 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
          if(!xraudio_kwd_result(detector->kwd_object, instance_kwd, &detector_chan->score, &detector_chan->snr, &detector_chan->endpoints)) {
             XLOGD_ERROR("keyword result channel <%u> instance <%u>", chan, instance_kwd);
          } else {
+            // if kwd detector snr used as a criterion and available from the HAL, update it
+            xraudio_hal_input_stats_t input_stats;
+            if(xraudio_hal_input_stats(params->hal_input_obj, &input_stats, false)) {
+               if(detector->criterion == XRAUDIO_KWD_CRITERION_SNR) {
+                  detector_chan->snr = input_stats.snr[chan];
+               }
+            }
             // update channel's results
             detector->result.channels[chan].score = detector_chan->score;
             detector->result.channels[chan].snr   = detector_chan->snr;
             detector->result.channels[chan].doa   = instance_kwd * 90;
 
-            // update max score if clearly the highest so far
+            // update max score or max snr, depending on active channel selection criterion, if clearly the highest so far
             if(detector->result.chan_selected >= XRAUDIO_INPUT_KWD_MAX_CHANNEL_QTY ||
-                  detector_chan->score > detector->result.channels[detector->result.chan_selected].score ||
-                  (fabs(detector_chan->score - detector->result.channels[detector->result.chan_selected].score) < 0.000001)) {
-               XLOGD_DEBUG("New max score/SNR detected: <%0.6f/%0.4f> ", detector_chan->score, detector_chan->snr);
+                  ((detector->criterion == XRAUDIO_KWD_CRITERION_SCORE) &&
+                   (detector_chan->score > detector->result.channels[detector->result.chan_selected].score ||
+                   (fabs(detector_chan->score - detector->result.channels[detector->result.chan_selected].score) < 0.000001))) ||
+                  ((detector->criterion == XRAUDIO_KWD_CRITERION_SNR) &&
+                   (detector_chan->snr > detector->result.channels[detector->result.chan_selected].snr ||
+                   (fabs(detector_chan->snr - detector->result.channels[detector->result.chan_selected].snr) < 0.000001)))) {
+               XLOGD_DEBUG("New max score/SNR detected: <%0.6f/%0.4f> using criterion %s", detector_chan->score, detector_chan->snr, xraudio_keyword_criterion_str(detector->criterion));
                detector->result.chan_selected = chan;
                detector->active_chan          = chan;
 
@@ -2786,6 +2798,7 @@ void xraudio_keyword_detector_init(xraudio_keyword_detector_t *detector, json_t 
    detector->callback                  = NULL;
    detector->cb_param                  = NULL;
    detector->result.chan_selected      = XRAUDIO_INPUT_KWD_MAX_CHANNEL_QTY;
+   detector->criterion                 = XRAUDIO_KWD_CRITERION_INVALID;
 
    for(uint8_t chan = 0; chan < XRAUDIO_INPUT_MAX_CHANNEL_QTY; chan++) {
       detector->result.channels[chan].score = -1.0;
@@ -2858,7 +2871,7 @@ void xraudio_keyword_detector_session_init(xraudio_keyword_detector_t *detector,
       }
    }
 
-   if(!xraudio_kwd_init(detector->kwd_object, chan_qty, sensitivity, NULL)) {
+   if(!xraudio_kwd_init(detector->kwd_object, chan_qty, sensitivity, NULL, &detector->criterion)) {
       XLOGD_ERROR("kwd init failed");
    }
 }

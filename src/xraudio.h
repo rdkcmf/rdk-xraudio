@@ -537,6 +537,8 @@ const char *     xraudio_eos_event_str(xraudio_eos_event_t type);
 const char *     xraudio_ppr_event_str(xraudio_ppr_event_t type);
 /// @brief Convert the xraudio_ppr_command_t type to a string
 const char *     xraudio_ppr_command_str(xraudio_ppr_command_t command);
+/// @brief Convert the xraudio_kwd_criterion_t type to a string
+const char *     xraudio_keyword_criterion_str(xraudio_kwd_criterion_t criterion);
 
 /// @brief Generate a wave file header
 /// @details Generate a wave header at the memory location specified by the header parameter using the specified audio_format, num_channels, sample_rate, bits_per_sample and pcm_data_size parameters.

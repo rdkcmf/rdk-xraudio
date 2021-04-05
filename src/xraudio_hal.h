@@ -148,6 +148,8 @@ typedef struct {
 typedef struct {
    uint32_t samples_buffered_max;
    uint32_t samples_lost;
+   float    snr[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
+   uint8_t  vad_confidence[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
 } xraudio_hal_input_stats_t;
 
 /// @}

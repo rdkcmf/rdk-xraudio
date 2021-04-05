@@ -32,6 +32,7 @@
 /// @{
 ///
 /// @defgroup XRAUDIO_KWD_TYPEDEFS    Typedefs
+/// @defgrouo XRAUDIO_KWD_ENUMS       Enumerations
 /// @defgroup XRAUDIO_KWD_STRUCTS     Structures
 /// @defgroup XRAUDIO_KWD_FUNCTIONS   Functions
 ///
@@ -52,6 +53,21 @@ typedef float xraudio_kwd_score_t;
 /// @brief xraudio KWD SNR
 /// @details The xraudio KWD SNR type is used to store the signal to noise ratio in DB.
 typedef float xraudio_kwd_snr_t;
+
+/// @}
+
+/// @addtogroup XRAUDIO_KWD_ENUMS
+/// @{
+/// @brief Enumerated Types
+/// @details The xraudio KWD api provides enumerated types for logical groups of values.
+
+/// @brief xraudio KWD criterion
+/// @details The xraudio KWD criterion enumeration indicates all the criteria available for determining the active channel
+typedef enum {
+   XRAUDIO_KWD_CRITERION_SCORE      = 0,  ///< The xraudio KWD active channel criterion is best detection score
+   XRAUDIO_KWD_CRITERION_SNR        = 1,  ///< The xraudio KWD active channel criterion is best detection snr
+   XRAUDIO_KWD_CRITERION_INVALID    = 2,
+} xraudio_kwd_criterion_t;
 
 /// @}
 
@@ -112,7 +128,7 @@ void                 xraudio_kwd_object_destroy(xraudio_kwd_object_t object);
 /// @param[in] object   Reference to an xraudio KWD object.
 /// @param[in]
 /// @param[in]
-bool                 xraudio_kwd_init(xraudio_kwd_object_t object, uint8_t chan_qty, uint8_t sensitivity, int *spot_delay);
+bool                 xraudio_kwd_init(xraudio_kwd_object_t object, uint8_t chan_qty, uint8_t sensitivity, int *spot_delay, xraudio_kwd_criterion_t *criterion);
 
 /// @brief Update xraudio KWD parameters
 /// @details Update an xraudio KWD object with the provided parameters.  Returns true for success and false for failure.

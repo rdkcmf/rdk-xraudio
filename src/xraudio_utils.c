@@ -667,3 +667,12 @@ const char *xraudio_ppr_command_str(xraudio_ppr_command_t command) {
    }
    return(xraudio_invalid_return(command));
 }
+
+const char *xraudio_keyword_criterion_str(xraudio_kwd_criterion_t criterion) {
+   switch(criterion) {
+      case XRAUDIO_KWD_CRITERION_SCORE:               return("SCORE");
+      case XRAUDIO_KWD_CRITERION_SNR:                 return("SNR");
+      case XRAUDIO_KWD_CRITERION_INVALID:             return("INVALID");
+   }
+   return(xraudio_invalid_return(criterion));
+}
