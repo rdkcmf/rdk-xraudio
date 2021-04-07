@@ -2054,19 +2054,13 @@ void xraudio_unpack_multi_int16(xraudio_session_record_t *session, void *buffer_
 
 void xraudio_unpack_mono_int32(xraudio_session_record_t *session, void *buffer_in, xraudio_audio_group_int16_t *audio_group_int16, xraudio_audio_group_float_t *audio_group_fp32, uint32_t frame_group_index, uint32_t sample_qty_frame) {
    int32_t *buffer_in_int32 = (int32_t *)buffer_in;
-   // Need to know bit qty for conversion
-#ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
-   uint8_t shift = 16;
-#else
-   uint8_t shift = 8;
-#endif
 
    XLOGD_DEBUG("group <%u> sample qty frame <%u>", frame_group_index, sample_qty_frame);
 
    int16_t *buffer_out_int16 = &audio_group_int16->frames[frame_group_index].samples[0];
    float *  buffer_out_fp32  = &audio_group_fp32->frames[frame_group_index].samples[0];
    for(uint32_t i = 0; i < sample_qty_frame; i++) {
-      *buffer_out_int16 = (int16_t)(*buffer_in_int32 >> shift);
+      *buffer_out_int16 = (int16_t)(*buffer_in_int32 >> 16);
       *buffer_out_fp32  = *buffer_in_int32;
       buffer_out_int16++;
       buffer_out_fp32++;
@@ -4166,30 +4160,21 @@ void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t fr
 #if defined(XRAUDIO_KWD_ENABLED) || defined(XRAUDIO_DGA_ENABLED)
 void xraudio_samples_convert_fp32_int16(int16_t *samples_int16, float *samples_fp32, uint32_t sample_qty, uint32_t bit_qty) {
    XLOGD_DEBUG("sample qty <%u> bit qty <%u>", sample_qty, bit_qty);
-#ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
+
    #ifdef XRAUDIO_DGA_ENABLED
    uint32_t shift_qty = 8; // attenuate by 48 dB to compensate for left justified DGA data
    #else
-   uint32_t shift_qty = 0; // TODO: may need to fix. Went from 16 to 0 bit shift to record pre-detect keyword to output file
+   uint32_t shift_qty = 0; // this needs to 16, but keep as 0 for now
    #endif
-   int32_t value_max = INT32_MAX;
-   int32_t value_min = INT32_MIN;
-#else
-   uint32_t shift_qty = (bit_qty - 16);
-   bit_qty--;
-   int32_t value_max = (1 << bit_qty) - 1;
-   int32_t value_min = -1 - value_max;
-#endif
+
    for(uint32_t i = 0; i < sample_qty; i++) {
-      int32_t sample_int32;
-      if(*samples_fp32 < value_min) {
-         sample_int32 = value_min;
-      } else if(*samples_fp32 > value_max) {
-         sample_int32 = value_max;
+      if(*samples_fp32 < INT32_MIN) {
+         *samples_int16 = INT16_MIN;
+      } else if(*samples_fp32 > INT32_MAX) {
+         *samples_int16 = INT16_MAX;
       } else {
-         sample_int32 = (int32_t)(*samples_fp32);
+         *samples_int16 = (int16_t)(((int32_t)(*samples_fp32)) >> shift_qty);
       }
-      *samples_int16 = (int16_t)(sample_int32 >> shift_qty); // Convert from x-bit to 16 bit
 
       samples_fp32++;
       samples_int16++;
@@ -4214,20 +4199,12 @@ void xraudio_samples_convert_fp32_int32(float *fp32buf, int32_t *int32buf, uint3
    uint32_t sample;
    int32_t *pi32 = int32buf;
    float *pf32 = fp32buf;
-#ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
-   int32_t value_max = INT32_MAX;
-   int32_t value_min = INT32_MIN;
-#else
-   bit_qty--;
-   int32_t value_max = (1 << bit_qty) - 1;
-   int32_t value_min = -1 - value_max;
-#endif
 
    for(sample = 0; sample < sample_qty_frame; sample++) {
-      if(*pf32 < value_min) {
-         *pi32 = value_min;
-      } else if(*pf32 > value_max) {
-         *pi32 = value_max;
+      if(*pf32 < INT32_MIN) {
+         *pi32 = INT32_MIN;
+      } else if(*pf32 > INT32_MAX) {
+         *pi32 = INT32_MAX;
       } else {
          *pi32 = *pf32;
       }
@@ -4237,66 +4214,23 @@ void xraudio_samples_convert_fp32_int32(float *fp32buf, int32_t *int32buf, uint3
 }
 
 void xraudio_samples_convert_int32_int16(int32_t *int32buf, int16_t *int16buf, uint32_t sample_qty_frame, uint32_t bit_qty) {
-   uint32_t sample;
    int32_t *pi32 = int32buf;
    int16_t *pi16 = int16buf;
 
-#ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
-   for(sample = 0; sample < sample_qty_frame; sample++) {
-      *pi32 >>= 16;
-      *pi16 = *pi32 & 0xffff;
+   for(uint32_t sample = 0; sample < sample_qty_frame; sample++) {
+      *pi16 = (*pi32 >> 16);
       pi16++;
       pi32++;
    }
-#else
-   uint32_t shift_qty = (bit_qty - 16);
-   bit_qty--;
-   int32_t value_max = (1 << bit_qty) - 1;
-   int32_t value_min = -1 - value_max;
-   for(sample = 0; sample < sample_qty_frame; sample++) {
-      *pi32 >>= shift_qty;
-      if(*pi32 > value_max) {
-         *pi16 = value_max;
-      } else if(*pi32 < value_min) {
-         *pi16 = value_min;
-      } else {
-         *pi16 = *pi32 & 0xffff;
-      }
-      pi16++;
-      pi32++;
-   }
-#endif
-
 }
 
 void xraudio_samples_convert_int32_fp32(int32_t *int32buf, float *fp32buf, uint32_t sample_qty_frame, uint32_t bit_qty) {
-   uint32_t sample;
    int32_t *pi32 = int32buf;
    float *pf32 = fp32buf;
 
-#ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
-   for(sample = 0; sample < sample_qty_frame; sample++) {
+   for(uint32_t sample = 0; sample < sample_qty_frame; sample++) {
       *pf32++ = *pi32++;
    }
-#else
-   uint32_t shift_qty = (bit_qty - 16);
-   bit_qty--;
-   int32_t value_max = (1 << bit_qty) - 1;
-   int32_t value_min = -1 - value_max;
-   for(sample = 0; sample < sample_qty_frame; sample++) {
-      *pi32 >>= shift_qty;
-      if(*pi32 > value_max) {
-         *pf32 = value_max;
-      } else if(*pi32 < value_min) {
-         *pf32 = value_min;
-      } else {
-         *pf32 = *pi32;
-      }
-      pf32++;
-      pi32++;
-   }
-#endif
-
 }
 #endif
 
@@ -4324,25 +4258,13 @@ int xraudio_in_capture_session_to_file_int32(xraudio_capture_point_t *capture_po
       for(uint32_t index = 0; index < sample_qty; index++) {
          // Handle endian difference for wave container
          #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-         #ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
          tmp_buf[j++] = (samples[index] >> 24) & 0xFF;
          tmp_buf[j++] = (samples[index] >> 16) & 0xFF;
          tmp_buf[j++] = (samples[index] >>  8) & 0xFF;
-         #else
-         tmp_buf[j++] = (samples[index] >> 16) & 0xFF;
-         tmp_buf[j++] = (samples[index] >>  8) & 0xFF;
-         tmp_buf[j++] = (samples[index])       & 0xFF;
-         #endif
          #elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-         #ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
          tmp_buf[j++] = (samples[index] >>  8) & 0xFF;
          tmp_buf[j++] = (samples[index] >> 16) & 0xFF;
          tmp_buf[j++] = (samples[index] >> 24) & 0xFF;
-         #else
-         tmp_buf[j++] = (samples[index])       & 0xFF;
-         tmp_buf[j++] = (samples[index] >>  8) & 0xFF;
-         tmp_buf[j++] = (samples[index] >> 16) & 0xFF;
-         #endif
          #else
          #error unhandled byte order
          #endif
@@ -4428,25 +4350,13 @@ int xraudio_in_capture_session_to_file_float(xraudio_capture_point_t *capture_po
       for(uint32_t index = 0; index < sample_qty; index++) {
          // Handle endian difference for wave container
          #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-         #ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
          tmp_buf[j++] = (((int32_t)samples[index]) >> 24) & 0xFF;
          tmp_buf[j++] = (((int32_t)samples[index]) >> 16) & 0xFF;
          tmp_buf[j++] = (((int32_t)samples[index]) >>  8) & 0xFF;
-         #else
-         tmp_buf[j++] = (((int32_t)samples[index]) >> 16) & 0xFF;
-         tmp_buf[j++] = (((int32_t)samples[index]) >>  8) & 0xFF;
-         tmp_buf[j++] = (((int32_t)samples[index]))       & 0xFF;
-         #endif
          #elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-         #ifdef XRAUDIO_24_BIT_LEFT_JUSTIFY
          tmp_buf[j++] = (((int32_t)samples[index]) >>  8) & 0xFF;
          tmp_buf[j++] = (((int32_t)samples[index]) >> 16) & 0xFF;
          tmp_buf[j++] = (((int32_t)samples[index]) >> 24) & 0xFF;
-         #else
-         tmp_buf[j++] = (((int32_t)samples[index]))       & 0xFF;
-         tmp_buf[j++] = (((int32_t)samples[index]) >>  8) & 0xFF;
-         tmp_buf[j++] = (((int32_t)samples[index]) >> 16) & 0xFF;
-         #endif
          #else
          #error unhandled byte order
          #endif
