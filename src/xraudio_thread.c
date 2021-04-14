@@ -3044,7 +3044,9 @@ bool xraudio_in_session_voice_get(xraudio_devices_input_t source) {
       XLOGD_INFO("Voice Session acquired for source %s", xraudio_devices_input_str(source));
       return(true);
    }
-   XLOGD_ERROR("Voice Session denied for source %s -- session in progress on source %s", xraudio_devices_input_str(source), xraudio_devices_input_str(xraudio_atomic_int_get(&g_voice_session.source)));
+   //xraudio_devices_input_str() returns the address of a static variable, so cannot use it twice in a single print
+   XLOGD_ERROR("Voice Session denied for source %s", xraudio_devices_input_str(source));
+   XLOGD_ERROR("Existing session still in progress on source %s", xraudio_devices_input_str(xraudio_atomic_int_get(&g_voice_session.source)));
    return(false);
 }
 
