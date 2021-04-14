@@ -754,7 +754,15 @@ xraudio_result_t xraudio_input_stream_to_pipe(xraudio_input_object_t object, xra
       obj->offset[index]          = offset;
       obj->until[index]           = until;
 
-      XLOGD_INFO("index <%u> pipe <%d> from <%s> offset <%d> until <%s> <%s>", index, pipe, xraudio_input_record_from_str(from), offset, xraudio_input_record_until_str(until), (callback == NULL) ? "sync" : "async");
+      if((index == 0) && (from == XRAUDIO_INPUT_RECORD_FROM_KEYWORD_BEGIN)) {
+         XLOGD_INFO("calling xraudio_hal_input_stream-start_set with offset %d\n", obj->stream_keyword_begin);
+         if(!xraudio_hal_input_stream_start_set(obj->hal_input_obj, obj->stream_keyword_begin)) {
+            XLOGD_ERROR("failed to set stream start point");
+            XRAUDIO_RECORD_MUTEX_UNLOCK();
+            return(XRAUDIO_RESULT_ERROR_INPUT);
+         }
+      }
+      XLOGD_INFO("index <%u> pipe <%d> from <%s> offset <%d> until <%s> <%s>", index, pipe, xraudio_input_record_from_str(from), offset, xraudio_input_record_until_str(until), (callback == NULL) ? "sync" : "async");     
    }
 
    xraudio_input_sound_intensity_fifo_open(obj);

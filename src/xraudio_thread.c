@@ -1630,6 +1630,11 @@ void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg) {
       xraudio_keyword_detector_session_init(&state->record.keyword_detector, detect->chan_qty, detect->sensitivity);
    }
    #endif
+
+   if(!xraudio_hal_input_keyword_detector_reset(state->params.hal_input_obj)) {
+      XLOGD_ERROR("unable to reset HAL keyword detector");
+     //Allow internal detector to run
+   }
    xraudio_keyword_detector_session_arm(&state->record.keyword_detector, detect->callback, detect->param, detect->sensitivity);
 
    // Set timeout for next chunk (in microseconds)
@@ -1683,22 +1688,80 @@ void xraudio_msg_detect_params(xraudio_thread_state_t *state, void *msg) {
 void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
    xraudio_queue_msg_async_session_begin_t *begin = (xraudio_queue_msg_async_session_begin_t *)msg;
    XLOGD_DEBUG("");
+   keyword_callback_event_t event = KEYWORD_CALLBACK_EVENT_DETECTED;
    xraudio_device_input_configuration_t configuration;
+
    memset(&configuration, 0, sizeof(configuration));
    if(xraudio_keyword_detector_session_is_armed(&state->record.keyword_detector)) {
       configuration.fd = -1;
 
-      state->record.external_obj_hal   = xraudio_input_hal_obj_external_get(state->params.hal_input_obj, begin->source, begin->format, &configuration);
-      state->record.external_fd        = configuration.fd;
+      //Clear this flag, it might be updated
+      state->record.use_hal_eos = false;
 
-      keyword_callback_event_t event = KEYWORD_CALLBACK_EVENT_DETECTED;
-      if(state->record.external_fd < 0) {
-         XLOGD_ERROR("invalid fd <%d>", state->record.external_fd);
-         event = KEYWORD_CALLBACK_EVENT_ERROR_FD;
+      if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(begin->source) != XRAUDIO_DEVICE_INPUT_NONE) { //Session initiated by HAL
+         xraudio_keyword_detector_result_t detector_result;
+         uint8_t ii;
+
+         //mic fd may have changed with firmware load
+         xraudio_input_hal_obj_external_get(state->params.hal_input_obj, begin->source, begin->format, &configuration);
+         state->record.fd                 = configuration.fd;
+
+         if(state->record.fd < 0) {
+            XLOGD_ERROR("invalid fd for HAL read <%d>", state->record.fd);
+            event = KEYWORD_CALLBACK_EVENT_ERROR_FD;
+         }
+
+         if(!begin->stream_params.valid) {
+            XLOGD_ERROR("HAL stream params not valid");
+            event = KEYWORD_CALLBACK_EVENT_ERROR;
+            memset(&detector_result, 0, sizeof(xraudio_keyword_detector_result_t));
+         } else {
+            for(ii=0;ii<XRAUDIO_INPUT_MAX_CHANNEL_QTY;ii++) {
+               detector_result.chan_selected      = 0;
+               detector_result.channels[ii].doa   = 0;
+               detector_result.channels[ii].score = 1.0;
+               detector_result.channels[ii].snr   = 10.0;
+            }
+
+            detector_result.endpoints.valid   = true;
+            detector_result.endpoints.pre     = begin->stream_params.kwd_pre;
+            detector_result.endpoints.begin   = begin->stream_params.kwd_begin;
+            detector_result.endpoints.end     = begin->stream_params.kwd_end;
+         }
+
+         //HAL capabilities might change after open(). For example when Llama loads NSM DSP image
+         #ifndef XRAUDIO_RESOURCE_MGMT
+         xraudio_hal_capabilities caps;
+         xraudio_hal_capabilities_get(&caps);
+         for(uint8_t index = 0; index < caps.input_qty; index++) { // Find the local microphone
+            if(caps.input_caps[index] & (XRAUDIO_CAPS_INPUT_LOCAL | XRAUDIO_CAPS_INPUT_LOCAL_32_BIT)) {
+               state->record.use_hal_eos = (caps.input_caps[index] & XRAUDIO_CAPS_INPUT_EOS_DETECTION);
+               state->record.eos_hal_cmd_pending = true;
+               XLOGD_INFO("state->record.use_hal_eos now %s, cmd_pending", state->record.use_hal_eos?"TRUE":"FALSE");
+            }
+         }
+         #endif
+
+         #ifdef XRAUDIO_KWD_ENABLED
+         state->record.keyword_detector.active_chan = 0;
+         #endif
+
+         //xraudio_msg_record_start uses some data from state->record.keyword_detector and it's not in use now so let's borrow
+         memcpy(&state->record.keyword_detector.result, &detector_result, sizeof(xraudio_keyword_detector_result_t));
+
+         xraudio_keyword_detector_session_event(&state->record.keyword_detector, begin->source, event, &detector_result, begin->format);
+      } else {  //Session initiated by PTT
+         state->record.external_obj_hal   = xraudio_input_hal_obj_external_get(state->params.hal_input_obj, begin->source, begin->format, &configuration);
+         state->record.external_fd        = configuration.fd;
+
+         if(state->record.external_fd < 0) {
+            XLOGD_ERROR("invalid fd for PTT read <%d>", state->record.external_fd);
+            event = KEYWORD_CALLBACK_EVENT_ERROR_FD;
+         }
+
+         xraudio_keyword_detector_session_event(&state->record.keyword_detector, begin->source, event, NULL, begin->format);
+         memcpy(&state->record.external_format, &begin->format, sizeof(state->record.external_format));
       }
-
-      xraudio_keyword_detector_session_event(&state->record.keyword_detector, begin->source, event, NULL, begin->format);
-      memcpy(&state->record.external_format, &begin->format, sizeof(state->record.external_format));
    }
 }
 
@@ -1884,7 +1947,7 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    xraudio_eos_event_t eos_event_hal = XRAUDIO_EOS_EVENT_NONE;
 
    rc = xraudio_hal_input_read(params->hal_input_obj, mic_frame_data, mic_frame_size, &eos_event_hal);
-   //XLOGD_INFO("bytes read %d, bytes expected %u, frame size %u", rc, mic_frame_size, session->frame_size_in);
+   XLOGD_DEBUG("bytes read %d, bytes expected %u, frame size %u", rc, mic_frame_size, session->frame_size_in);
    if(rc != (int) mic_frame_size) {
       if(rc < 0) {
          XLOGD_ERROR("hal mic read: error %d", rc);
@@ -1912,6 +1975,8 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    xraudio_input_stats_timestamp_frame_read(params->obj_input);
 
    #ifdef XRAUDIO_PPR_ENABLED
+   //PPR is not going to play nicely with NSM. RDK-31486 is making EOS, PPR, and DGA options based on variables.
+   //Will be fixed in RDK-29850
    xraudio_ppr_event_t ppr_event;
    if (params->dsp_config.ppr_enabled) {
       xraudio_preprocess_mic_data(params, session, &ppr_event);
@@ -3874,6 +3939,7 @@ bool xraudio_hal_msg_async_handler(void *msg) {
             begin_msg.header.type = XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN;
             begin_msg.source = begin->header.source;
             memcpy(&begin_msg.format, &begin->format, sizeof(xraudio_input_format_t));
+            memcpy(&begin_msg.stream_params, &begin->stream_params, sizeof(xraudio_hal_stream_params_t));
             queue_msg_push(g_voice_session.msgq, (char *)&begin_msg, sizeof(begin_msg));
             ret = true;
          }

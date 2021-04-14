@@ -81,27 +81,28 @@
 #define XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(x)    ((int8_t)roundf((x) / 6.02)) // 6 dB per bit shift
 
 typedef enum {
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_START   = 0,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_STOP    = 1,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_START        = 2,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_STOP         = 3,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_START       = 4,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_STOP        = 5,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_IDLE           = 6,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_START          = 7,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_PAUSE          = 8,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_RESUME         = 9,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_STOP           = 10,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT              = 11,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_PARAMS       = 12,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN = 13,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END   = 14,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR   = 15,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_TERMINATE           = 16,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL         = 17,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE          = 18,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE        = 19,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID             = 20,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_START            = 0,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_STOP             = 1,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_START                 = 2,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_STOP                  = 3,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_START                = 4,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_STOP                 = 5,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_IDLE                    = 6,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_START                   = 7,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_PAUSE                   = 8,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_RESUME                  = 9,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_STOP                    = 10,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT                       = 11,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_PARAMS                = 12,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN          = 13,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END            = 14,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR            = 15,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_TERMINATE                    = 16,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL                  = 17,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE                   = 18,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE                 = 19,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_STREAM_START_SET             = 20,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID                      = 21,
 } xraudio_main_queue_msg_type_t;
 
 #ifdef XRAUDIO_RESOURCE_MGMT
@@ -323,6 +324,8 @@ typedef struct {
    xraudio_main_queue_msg_header_t header;
    xraudio_devices_input_t         source;
    xraudio_input_format_t          format;
+   //Optional field for DSP keyword detection
+   xraudio_hal_stream_params_t     stream_params;
 } xraudio_queue_msg_async_session_begin_t;
 
 typedef struct {
