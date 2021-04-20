@@ -78,7 +78,7 @@ void                 xraudio_dga_object_destroy(xraudio_dga_object_t object);
 /// @param[in]
 /// @param[in]
 /// @param[in]
-void                 xraudio_dga_calculate(xraudio_dga_object_t object, uint8_t *pcm_bit_qty, uint32_t frame_qty, float *samples[], uint32_t sample_qty[]);
+void                 xraudio_dga_calculate(xraudio_dga_object_t object, uint8_t *pcm_bit_qty, uint32_t frame_qty, const float *samples[], uint32_t sample_qty[]);
 
 /// @brief Apply gain to audio
 /// @details Apply gain to the audio provided.

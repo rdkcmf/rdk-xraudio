@@ -78,6 +78,8 @@
 
 #define XRAUDIO_OUTPUT_FRAME_PERIOD (20)    // in milliseconds
 
+#define XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(x)    ((int8_t)roundf((x) / 6.02)) // 6 dB per bit shift
+
 typedef enum {
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_START   = 0,
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_STOP    = 1,

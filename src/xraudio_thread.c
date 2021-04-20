@@ -276,6 +276,7 @@ struct xraudio_session_record_t {
    uint32_t                     external_keyword_end_samples;
    uint32_t                     external_keyword_end_bytes;
    bool                         keyword_flush;
+   int8_t                       input_aop_adjust_shift;
 };
 
 typedef struct {
@@ -443,6 +444,7 @@ static void xraudio_msg_power_mode(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_privacy_mode(xraudio_thread_state_t *state, void *msg);
 
 static void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t frame_duration, uint32_t *frame_size, uint16_t stream_time_minimum, uint32_t *min_audio_data_len);
+static bool xraudio_in_aop_adjust_apply(int32_t *buffer, uint32_t sample_qty_frame, int8_t input_aop_adjust_shift);
 
 static const xraudio_msg_handler_t g_xraudio_msg_handlers[XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID] = {
    xraudio_msg_record_idle_start,
@@ -567,6 +569,27 @@ void *xraudio_main_thread(void *param) {
    state.record.dynamic_gain_set         = false;
    state.record.dynamic_gain_pcm_bit_qty = 0;
    #endif
+
+   // get xraudio input config for acoustic overload point adjustment (in dB converted to bit shift)
+   float aop_adj_config = JSON_FLOAT_VALUE_INPUT_AOP_ADJUST;
+   state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(JSON_FLOAT_VALUE_INPUT_AOP_ADJUST);
+   if(NULL == state.params.json_obj_input) {
+      XLOGD_INFO("parameter json_obj_input is null, using defaults");
+   } else {
+      json_t *jaop_adj_config = json_object_get(state.params.json_obj_input, JSON_FLOAT_NAME_INPUT_AOP_ADJUST);
+      if(jaop_adj_config != NULL && json_is_real(jaop_adj_config)) {
+         aop_adj_config = json_real_value(jaop_adj_config);
+         if(aop_adj_config > 0.0 || aop_adj_config < -100.0) {
+            XLOGD_INFO("invalid AOC adjustment. using default");
+         } else {
+            state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(aop_adj_config);   // convert AOP dB adjustment to bit shift
+         }
+      } else {
+         XLOGD_INFO("AOP adjust value not found, using default");
+      }
+   }
+   XLOGD_INFO("input AOP adjusted by <%f> dB (shifted right <%d> bits)", aop_adj_config, state.record.input_aop_adjust_shift);
+
    state.record.devices_input          = XRAUDIO_DEVICE_INPUT_NONE;
    state.record.eos_event              = XRAUDIO_EOS_EVENT_NONE;
    state.record.timestamp_next         = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
@@ -2056,7 +2079,8 @@ void xraudio_unpack_multi_int16(xraudio_session_record_t *session, void *buffer_
 void xraudio_unpack_mono_int32(xraudio_session_record_t *session, void *buffer_in, xraudio_audio_group_int16_t *audio_group_int16, xraudio_audio_group_float_t *audio_group_fp32, uint32_t frame_group_index, uint32_t sample_qty_frame) {
    int32_t *buffer_in_int32 = (int32_t *)buffer_in;
 
-   XLOGD_DEBUG("group <%u> sample qty frame <%u>", frame_group_index, sample_qty_frame);
+   //XLOGD_DEBUG("group <%u> sample qty frame <%u>", frame_group_index, sample_qty_frame);
+   xraudio_in_aop_adjust_apply(buffer_in_int32, sample_qty_frame, session->input_aop_adjust_shift);
 
    int16_t *buffer_out_int16 = &audio_group_int16->frames[frame_group_index].samples[0];
    float *  buffer_out_fp32  = &audio_group_fp32->frames[frame_group_index].samples[0];
@@ -2073,7 +2097,7 @@ void xraudio_unpack_multi_int32(xraudio_session_record_t *session, void *buffer_
    int32_t *buffer_in_int32 = (int32_t *)buffer_in;
    uint32_t sample_qty_channel = sample_qty_frame / chan_qty;
 
-   XLOGD_DEBUG("group <%u> sample qty frame <%u> sample qty channel <%u>", frame_group_index, sample_qty_frame, sample_qty_channel);
+   //XLOGD_DEBUG("group <%u> sample qty frame <%u> sample qty channel <%u>", frame_group_index, sample_qty_frame, sample_qty_channel);
 
    for(uint32_t chan = 0; chan < chan_qty; chan++) {
       int32_t *samples = &buffer_in_int32[chan * sample_qty_channel];
@@ -2342,7 +2366,7 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
          uint32_t  frame_qty = (samples[0] != NULL) + (samples[1] != NULL);
 
          session->dynamic_gain_pcm_bit_qty = session->pcm_bit_qty;
-         xraudio_dga_calculate(session->obj_dga, &session->dynamic_gain_pcm_bit_qty, frame_qty, samples, sample_qty);
+         xraudio_dga_calculate(session->obj_dga, &session->dynamic_gain_pcm_bit_qty, frame_qty, (const float **)samples, sample_qty);
          XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", session->pcm_bit_qty, session->dynamic_gain_pcm_bit_qty);
       }
    }
@@ -4174,19 +4198,13 @@ void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t fr
 void xraudio_samples_convert_fp32_int16(int16_t *samples_int16, float *samples_fp32, uint32_t sample_qty, uint32_t bit_qty) {
    XLOGD_DEBUG("sample qty <%u> bit qty <%u>", sample_qty, bit_qty);
 
-   #ifdef XRAUDIO_DGA_ENABLED
-   uint32_t shift_qty = 8; // attenuate by 48 dB to compensate for left justified DGA data
-   #else
-   uint32_t shift_qty = 0; // this needs to 16, but keep as 0 for now
-   #endif
-
    for(uint32_t i = 0; i < sample_qty; i++) {
       if(*samples_fp32 < INT32_MIN) {
          *samples_int16 = INT16_MIN;
       } else if(*samples_fp32 > INT32_MAX) {
          *samples_int16 = INT16_MAX;
       } else {
-         *samples_int16 = (int16_t)(((int32_t)(*samples_fp32)) >> shift_qty);
+         *samples_int16 = (int16_t)(((int32_t)(*samples_fp32)) >> 16);
       }
 
       samples_fp32++;
@@ -4400,6 +4418,27 @@ int xraudio_in_capture_session_to_file_float(xraudio_capture_point_t *capture_po
    return(data_size);
 }
 #endif
+
+bool xraudio_in_aop_adjust_apply(int32_t *buffer, uint32_t sample_qty_frame, int8_t input_aop_adjust_shift) {
+   int32_t *buffer_in_int32 = buffer;
+   if(input_aop_adjust_shift >= 0) {
+      return(false); // xraudio AOP greater than input mic AOP not supported
+   }
+   int32_t max_value = INT32_MAX >> abs(input_aop_adjust_shift);
+   int32_t min_value = INT32_MIN >> abs(input_aop_adjust_shift);
+
+   for(uint32_t i = 0; i < sample_qty_frame; i++) {
+      if(*buffer_in_int32 > max_value) {
+         *buffer_in_int32 = INT32_MAX;
+      } else if(*buffer_in_int32 < min_value) {
+         *buffer_in_int32 = INT32_MIN;
+      } else {
+         *buffer_in_int32 <<= abs(input_aop_adjust_shift);
+      }
+      buffer_in_int32++;
+   }
+   return(true);
+}
 
 #ifdef XRAUDIO_PPR_ENABLED
 void xraudio_preprocess_mic_data(xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_ppr_event_t *ppr_event) {
