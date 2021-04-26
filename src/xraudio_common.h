@@ -52,14 +52,9 @@
 
 #define XRAUDIO_OUTPUT_FRAME_PERIOD            (20)                                ///< Output frame period in milliseconds
 
-#ifndef XRAUDIO_INPUT_ASR_MAX_CHANNEL_QTY
-#define XRAUDIO_INPUT_ASR_MAX_CHANNEL_QTY      (0)                                 ///< Input channel quantity audio to ASR/cloud
-#endif
+#define XRAUDIO_INPUT_ASR_MAX_CHANNEL_QTY      (1)                                 ///< Input channel quantity audio to ASR/cloud
 
-#ifndef XRAUDIO_INPUT_KWD_MAX_CHANNEL_QTY
 #define XRAUDIO_INPUT_KWD_MAX_CHANNEL_QTY      (XRAUDIO_INPUT_MAX_CHANNEL_QTY)     ///< Input channel quantity audio to keyword detector
-#endif
-#define XRAUDIO_INPUT_ASR_KWD_CHANNEL_QTY      (XRAUDIO_INPUT_ASR_MAX_CHANNEL_QTY + XRAUDIO_INPUT_KWD_MAX_CHANNEL_QTY)  ///< Input channel total quantity audio to ASR and keyword detector
 
 #define XRAUDIO_ADPCM_XVP_COMMAND_ID_MIN       (0x20)    ///< Minimum bound of command id as defined by XVP Spec.
 #define XRAUDIO_ADPCM_XVP_COMMAND_ID_MAX       (0x3F)    ///< Maximum bound of command id as defined by XVP Spec.

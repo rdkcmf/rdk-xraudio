@@ -66,6 +66,7 @@ typedef struct {
    #ifdef XRAUDIO_OVC_ENABLED
    xraudio_ovc_object_t           obj_ovc;
    #endif
+   xraudio_hal_dsp_config_t       dsp_config;
 } xraudio_output_obj_t;
 
 static bool             xraudio_output_object_is_valid(xraudio_output_obj_t *obj);
@@ -89,7 +90,7 @@ static void             xraudio_output_stats_timing_print(xraudio_output_obj_t *
 static void             xraudio_output_close_locked(xraudio_output_obj_t *obj);
 static xraudio_result_t xraudio_output_stop_locked(xraudio_output_obj_t *obj);
 
-xraudio_output_object_t xraudio_output_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, json_t *json_obj_output) {
+xraudio_output_object_t xraudio_output_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, xraudio_hal_dsp_config_t dsp_config, json_t* json_obj_output) {
    xraudio_output_obj_t *obj = (xraudio_output_obj_t *)malloc(sizeof(xraudio_output_obj_t));
 #ifdef XRAUDIO_EOS_ENABLED
    json_t *jeos_config = NULL;
@@ -125,6 +126,7 @@ xraudio_output_object_t xraudio_output_object_create(xraudio_hal_obj_t hal_obj, 
    obj->volume_right         = XRAUDIO_VOLUME_NOM;
    obj->volume_mono_cur      = XRAUDIO_VOLUME_NOM;
    obj->play_bumper          = 0;
+   obj->dsp_config           = dsp_config;
    #ifdef XRAUDIO_EOS_ENABLED
    if(NULL == json_obj_output) {
       XLOGD_INFO("json_obj_output is null, using defaults");
@@ -980,7 +982,7 @@ xraudio_eos_event_t xraudio_output_eos_run(xraudio_output_object_t object, int16
       return(XRAUDIO_EOS_EVENT_NONE);
    }
    #ifdef XRAUDIO_EOS_ENABLED
-   return(xraudio_eos_run_int16(obj->obj_eos, input_samples, sample_qty));
+   return (obj->dsp_config.eos_enabled) ? xraudio_eos_run_int16(obj->obj_eos, input_samples, sample_qty) : XRAUDIO_EOS_EVENT_NONE;
    #else
    return(XRAUDIO_EOS_EVENT_NONE);
    #endif
@@ -993,7 +995,7 @@ unsigned char xraudio_output_signal_level_get(xraudio_output_object_t object) {
       return(0);
    }
    #ifdef XRAUDIO_EOS_ENABLED
-   if(obj->state == XRAUDIO_OUTPUT_STATE_PLAYING) {
+   if(obj->state == XRAUDIO_OUTPUT_STATE_PLAYING && obj->dsp_config.eos_enabled) {
       return(xraudio_eos_signal_level_get(obj->obj_eos));
    }
    #endif

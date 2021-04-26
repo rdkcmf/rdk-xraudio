@@ -160,6 +160,14 @@ typedef struct {
    uint8_t  vad_confidence[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
 } xraudio_hal_input_stats_t;
 
+typedef struct {
+   bool    ppr_enabled;
+   bool    dga_enabled;
+   bool    eos_enabled;
+   uint8_t input_asr_max_channel_qty;
+   uint8_t input_kwd_max_channel_qty;
+} xraudio_hal_dsp_config_t;
+
 /// @}
 
 #ifdef __cplusplus
@@ -172,8 +180,11 @@ extern "C" {
 /// @details The xraudio client api provides functions to be called directly by the client.
 
 void              xraudio_hal_version(xraudio_version_info_t *version_info, uint32_t *qty);
+bool              xraudio_hal_init(json_t *obj_config);
 void              xraudio_hal_capabilities_get(xraudio_hal_capabilities *caps);
-xraudio_hal_obj_t xraudio_hal_open(bool debug, xraudio_power_mode_t power_mode, bool privacy_mode, xraudio_hal_msg_callback_t callback, json_t *obj_config);
+bool              xraudio_hal_dsp_config_get(xraudio_hal_dsp_config_t *dsp_config);
+bool              xraudio_hal_available_devices_get(xraudio_devices_input_t *inputs, uint32_t input_qty_max, xraudio_devices_output_t *outputs, uint32_t output_qty_max);
+xraudio_hal_obj_t xraudio_hal_open(bool debug, xraudio_power_mode_t power_mode, bool privacy_mode, xraudio_hal_msg_callback_t callback);
 bool              xraudio_hal_power_mode(xraudio_hal_obj_t obj, xraudio_power_mode_t power_mode);
 bool              xraudio_hal_privacy_mode(xraudio_hal_obj_t obj, bool enable);
 void              xraudio_hal_close(xraudio_hal_obj_t obj);

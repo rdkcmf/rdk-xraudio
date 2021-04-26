@@ -155,6 +155,7 @@ typedef struct {
    xraudio_internal_capture_params_t internal_capture_params;
    json_t*                           json_obj_input;
    json_t*                           json_obj_output;
+   xraudio_hal_dsp_config_t          dsp_config;
 } xraudio_main_thread_params_t;
 
 #ifdef XRAUDIO_RESOURCE_MGMT

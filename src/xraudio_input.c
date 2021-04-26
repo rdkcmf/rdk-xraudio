@@ -126,6 +126,7 @@ typedef struct {
    uint16_t                      stream_time_minimum;
    uint32_t                      stream_keyword_begin;
    uint32_t                      stream_keyword_duration;
+   xraudio_hal_dsp_config_t      dsp_config;
 } xraudio_input_obj_t;
 
 static bool             xraudio_input_object_is_valid(xraudio_input_obj_t *obj);
@@ -154,7 +155,7 @@ static void             xraudio_input_close_locked(xraudio_input_obj_t *obj);
 static xraudio_result_t xraudio_input_stop_locked(xraudio_input_obj_t *obj, int32_t index);
 static xraudio_result_t xraudio_input_capture_stop_locked(xraudio_input_obj_t *obj);
 
-xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, xr_mq_t msgq, uint16_t capabilities, json_t *json_obj_input) {
+xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, xraudio_hal_dsp_config_t dsp_config, json_t *json_obj_input) {
    #ifdef XRAUDIO_EOS_ENABLED
    json_t *jeos_config = NULL;
    #endif
@@ -198,6 +199,7 @@ xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, ui
    obj->hal_input_obj            = NULL;
    obj->fifo_sound_intensity     = -1;
    obj->statistics               = (xraudio_input_statistics_t) { .frames_lost = 0 };
+   obj->dsp_config               = dsp_config;
    if(NULL == json_obj_input) {
       XLOGD_INFO("json_obj_input is null, using defaults");
    } else {
@@ -985,14 +987,14 @@ void xraudio_input_keyword_detected(xraudio_input_object_t object) {
       return;
    }
 #ifdef XRAUDIO_EOS_ENABLED
-   if(obj->state == XRAUDIO_INPUT_STATE_DETECTING) {
+   if(obj->state == XRAUDIO_INPUT_STATE_DETECTING && obj->dsp_config.eos_enabled) {
       for (int i = 0; i < XRAUDIO_INPUT_MAX_CHANNEL_QTY; ++i) {
          xraudio_eos_state_set_speech_begin(obj->obj_eos[i]);
       }
    }
 #endif
 #ifdef XRAUDIO_PPR_ENABLED
-   if(obj->state == XRAUDIO_INPUT_STATE_DETECTING) {
+   if(obj->state == XRAUDIO_INPUT_STATE_DETECTING && obj->dsp_config.ppr_enabled) {
       xraudio_ppr_command(obj->obj_ppr, XRAUDIO_PPR_COMMAND_KEYWORD_DETECT);
    }
 #endif
@@ -1020,8 +1022,10 @@ unsigned char xraudio_input_signal_level_get(xraudio_input_object_t object, uint
       return(0);
    }
 #ifdef XRAUDIO_EOS_ENABLED
-   if(obj->state == XRAUDIO_INPUT_STATE_DETECTING || obj->state == XRAUDIO_INPUT_STATE_RECORDING || obj->state == XRAUDIO_INPUT_STATE_STREAMING) {
-      return(xraudio_eos_signal_level_get(obj->obj_eos[chan]));
+   if(obj->dsp_config.eos_enabled) {
+      if(obj->state == XRAUDIO_INPUT_STATE_DETECTING || obj->state == XRAUDIO_INPUT_STATE_RECORDING || obj->state == XRAUDIO_INPUT_STATE_STREAMING) {
+         return(xraudio_eos_signal_level_get(obj->obj_eos[chan]));
+      }
    }
 #endif
    return(0);
@@ -1052,7 +1056,7 @@ xraudio_eos_event_t xraudio_input_eos_run(xraudio_input_object_t object, uint8_t
       XLOGD_ERROR("Bad channel (%hu).", (uint16_t)chan);
       return(0);
    }
-   return(xraudio_eos_run_float(obj->obj_eos[chan], input_samples, sample_qty, scaled_eos_samples));
+   return (obj->dsp_config.eos_enabled) ? xraudio_eos_run_float(obj->obj_eos[chan], input_samples, sample_qty, scaled_eos_samples) : XRAUDIO_EOS_EVENT_NONE;
 #else
    return XRAUDIO_EOS_EVENT_NONE;
 #endif
@@ -1065,9 +1069,11 @@ void xraudio_input_eos_state_set_speech_begin(xraudio_input_object_t object) {
       XLOGD_ERROR("Invalid object.");
       return;
    }
-   XLOGD_DEBUG("Keyword detected. Force VADEOS to start.");
-   for (int i = 0; i < XRAUDIO_INPUT_MAX_CHANNEL_QTY; ++i) {
-      xraudio_eos_state_set_speech_begin(obj->obj_eos[i]);
+   if(obj->dsp_config.eos_enabled) {
+      XLOGD_DEBUG("Keyword detected. Force VADEOS to start.");
+      for (int i = 0; i < XRAUDIO_INPUT_MAX_CHANNEL_QTY; ++i) {
+         xraudio_eos_state_set_speech_begin(obj->obj_eos[i]);
+      }
    }
 #endif
 }
@@ -1080,28 +1086,32 @@ xraudio_ppr_event_t xraudio_input_ppr_run(xraudio_input_object_t object, uint16_
       XLOGD_ERROR("Invalid object.");
       return(XRAUDIO_PPR_EVENT_NONE);
    }
-   event = xraudio_ppr_run(
-               obj->obj_ppr,
-               frame_size_in_samples,
-               ppmic_input_buffers,
-               ppref_input_buffers,
-               ppkwd_output_buffers,
-               ppasr_output_buffers,
-               ppref_output_buffers
-           );
+   if(obj->dsp_config.ppr_enabled) {
+      event = xraudio_ppr_run(
+                  obj->obj_ppr,
+                  frame_size_in_samples,
+                  ppmic_input_buffers,
+                  ppref_input_buffers,
+                  ppkwd_output_buffers,
+                  ppasr_output_buffers,
+                  ppref_output_buffers
+              );
+   }
 #endif
    return(event);
 }
 
 void xraudio_input_ppr_state_set_speech_begin(xraudio_input_object_t object) {
-#if defined(XRAUDIO_PPR_ENABLED) && !defined(XRAUDIO_EOS_ENABLED)
+#if defined(XRAUDIO_PPR_ENABLED)
    // Tell ppr that keyword was detected and begin streaming speech and look for end of speech
    xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
    if(!xraudio_input_object_is_valid(obj)) {
       XLOGD_ERROR("Invalid object.");
       return;
    }
-   xraudio_ppr_command(obj->obj_ppr, XRAUDIO_PPR_COMMAND_KEYWORD_DETECT);
+   if(obj->dsp_config.ppr_enabled && !obj->dsp_config.eos_enabled) {
+      xraudio_ppr_command(obj->obj_ppr, XRAUDIO_PPR_COMMAND_KEYWORD_DETECT);
+   }
 #endif
 }
 

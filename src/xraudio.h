@@ -64,6 +64,8 @@
 #define XRAUDIO_INPUT_MIN_CHANNEL_QTY          (XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY) ///< Minimum input channel quantity
 #define XRAUDIO_INPUT_MAX_CHANNEL_QTY          (4)                                 ///< Maximum input channel quantity
 
+#define XRAUDIO_INPUT_MAX_DEVICE_QTY           (3)                                 ///< Maximum input devices (ff, ptt, mic)
+
 #define XRAUDIO_INPUT_MIN_FRAME_GROUP_QTY      (1)                                 ///< Minimum input frame group quantity
 #define XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY      (10)                                ///< Maximum input frame group quantity
 #define XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY  (XRAUDIO_INPUT_MIN_FRAME_GROUP_QTY) ///< Default input frame group quantity
@@ -81,6 +83,8 @@
 
 #define XRAUDIO_OUTPUT_MIN_CHANNEL_QTY         (1)                                 ///< Minimum output channel quantity
 #define XRAUDIO_OUTPUT_MAX_CHANNEL_QTY         (2)                                 ///< Maximum output channel quantity
+
+#define XRAUDIO_OUTPUT_MAX_DEVICE_QTY          (1)                                 ///< Maximum output devices
 
 #define XRAUDIO_STREAM_ID_SIZE_MAX             (64)
 
@@ -331,6 +335,10 @@ xraudio_object_t xraudio_object_create(const json_t *json_obj_xraudio_config);
 /// @brief Destroy an xraudio object
 /// @details Destroy an xraudio object.  If playback or recording sessions are active, they will be stopped. If xraudio devices are opened, they will be closed.  If resources have been allocated, they will be released.
 void             xraudio_object_destroy(xraudio_object_t object);
+
+/// @brief Get available input and output devices
+/// @details Return an array of the available input and output devices from xraudio
+xraudio_result_t xraudio_available_devices_get(xraudio_object_t object, xraudio_devices_input_t *inputs, uint32_t input_qty_max, xraudio_devices_output_t *outputs, uint32_t output_qty_max);
 
 /// @brief Request resources
 /// @details Request the specified input and output devices.  The priority parameter provides a course level with which the resources will be allocated.  Higher priority requests will be granted before lower priority requests.

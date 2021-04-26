@@ -38,7 +38,7 @@ typedef void * xraudio_output_object_t;
 extern "C" {
 #endif
 
-xraudio_output_object_t  xraudio_output_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, json_t* jeos_config);
+xraudio_output_object_t  xraudio_output_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, xraudio_hal_dsp_config_t dsp_config, json_t* json_obj_output);
 void                     xraudio_output_object_destroy(xraudio_output_object_t object);
 void                     xraudio_output_open(xraudio_output_object_t object, xraudio_devices_output_t device, xraudio_power_mode_t power_mode, xraudio_resource_id_output_t resource_id, uint16_t capabilities);
 void                     xraudio_output_close(xraudio_output_object_t object);

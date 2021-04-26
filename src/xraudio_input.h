@@ -37,7 +37,7 @@ typedef void * xraudio_input_object_t;
 extern "C" {
 #endif
 
-xraudio_input_object_t  xraudio_input_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, json_t *jeos_config);
+xraudio_input_object_t  xraudio_input_object_create(xraudio_hal_obj_t hal_obj, uint8_t user_id, int msgq, uint16_t capabilities, xraudio_hal_dsp_config_t dsp_config, json_t *json_obj_input);
 void                    xraudio_input_object_destroy(xraudio_input_object_t object);
 xraudio_hal_input_obj_t xraudio_input_hal_obj_get(xraudio_input_object_t object);
 xraudio_result_t        xraudio_input_open(xraudio_input_object_t object, xraudio_devices_input_t device, xraudio_power_mode_t power_mode, bool privacy_mode, xraudio_resource_id_input_t resource_id, uint16_t capabilities, xraudio_input_format_t format);
