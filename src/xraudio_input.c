@@ -380,6 +380,18 @@ xraudio_result_t xraudio_input_open(xraudio_input_object_t object, xraudio_devic
       }
    }
 
+   //HAL capabilities and dsp_config might change after open(). For example when Llama loads NSM DSP image
+   #ifndef XRAUDIO_RESOURCE_MGMT
+   xraudio_hal_capabilities caps;
+   xraudio_hal_capabilities_get(&caps);
+   for(uint8_t index = 0; index < caps.input_qty; index++) { // Find the local microphone
+      if(caps.input_caps[index] & (XRAUDIO_CAPS_INPUT_LOCAL | XRAUDIO_CAPS_INPUT_LOCAL_32_BIT)) {
+          capabilities = caps.input_caps[index];
+      }
+   }
+   #endif
+   xraudio_hal_dsp_config_get(&obj->dsp_config);
+
    obj->device             = device;
    obj->resource_id        = resource_id;
    obj->capabilities       = capabilities;

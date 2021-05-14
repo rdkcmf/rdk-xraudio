@@ -1717,9 +1717,6 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
    if(xraudio_keyword_detector_session_is_armed(&state->record.keyword_detector)) {
       configuration.fd = -1;
 
-      //Clear this flag, it might be updated
-      state->record.use_hal_eos = false;
-
       if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(begin->source) != XRAUDIO_DEVICE_INPUT_NONE) { //Session initiated by HAL
          xraudio_keyword_detector_result_t detector_result;
          uint8_t ii;
@@ -1752,19 +1749,6 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
             detector_result.detector_name   = begin->stream_params.keyword_detector;
             detector_result.dsp_name        = begin->stream_params.dsp_name;
          }
-
-         //HAL capabilities might change after open(). For example when Llama loads NSM DSP image
-         #ifndef XRAUDIO_RESOURCE_MGMT
-         xraudio_hal_capabilities caps;
-         xraudio_hal_capabilities_get(&caps);
-         for(uint8_t index = 0; index < caps.input_qty; index++) { // Find the local microphone
-            if(caps.input_caps[index] & (XRAUDIO_CAPS_INPUT_LOCAL | XRAUDIO_CAPS_INPUT_LOCAL_32_BIT)) {
-               state->record.use_hal_eos = (caps.input_caps[index] & XRAUDIO_CAPS_INPUT_EOS_DETECTION);
-               state->record.eos_hal_cmd_pending = true;
-               XLOGD_INFO("state->record.use_hal_eos now %s, cmd_pending", state->record.use_hal_eos?"TRUE":"FALSE");
-            }
-         }
-         #endif
 
          #ifdef XRAUDIO_KWD_ENABLED
          state->record.keyword_detector.active_chan = 0;
@@ -2016,8 +2000,6 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    xraudio_input_stats_timestamp_frame_read(params->obj_input);
 
    #ifdef XRAUDIO_PPR_ENABLED
-   //PPR is not going to play nicely with NSM. RDK-31486 is making EOS, PPR, and DGA options based on variables.
-   //Will be fixed in RDK-29850
    xraudio_ppr_event_t ppr_event;
    if (params->dsp_config.ppr_enabled) {
       xraudio_preprocess_mic_data(params, session, &ppr_event);
@@ -3065,6 +3047,11 @@ void xraudio_keyword_detector_session_init(xraudio_keyword_detector_t *detector,
    }
 
    XLOGD_INFO("init <%u> kwd instances", chan_qty);
+
+   if(chan_qty==0) {
+      return;
+   }
+
    for(uint8_t chan = 0; chan < XRAUDIO_INPUT_MAX_CHANNEL_QTY; chan++) {
       detector->result.channels[chan].score = -1.0;
       detector->result.channels[chan].snr   =  0.0;
