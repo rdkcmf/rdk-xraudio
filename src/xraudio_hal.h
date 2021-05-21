@@ -213,6 +213,7 @@ bool                     xraudio_hal_input_detection(xraudio_hal_input_obj_t obj
 bool                     xraudio_hal_input_eos_cmd(xraudio_hal_input_obj_t obj, xraudio_eos_cmd_t cmd, uint32_t chan);
 bool                     xraudio_hal_input_stream_start_set(xraudio_hal_input_obj_t obj, uint32_t start_sample);
 bool                     xraudio_hal_input_keyword_detector_reset(xraudio_hal_input_obj_t obj);
+bool                     xraudio_hal_input_test_mode(xraudio_hal_input_obj_t obj, bool enable);
 
 xraudio_hal_output_obj_t xraudio_hal_output_open(xraudio_hal_obj_t hal_obj, xraudio_devices_output_t device, xraudio_resource_id_output_t resource, uint8_t user_id, xraudio_output_format_t *format, xraudio_volume_step_t left, xraudio_volume_step_t right);
 void                     xraudio_hal_output_close(xraudio_hal_output_obj_t obj, xraudio_devices_output_t device);

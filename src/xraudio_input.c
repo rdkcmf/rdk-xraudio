@@ -70,6 +70,7 @@ typedef struct {
    xraudio_capture_t   type;
    xraudio_container_t container;
    const char *        audio_file_path;
+   bool                raw_mic_enable;
 } xraudio_input_capture_t;
 
 typedef struct {
@@ -1228,7 +1229,7 @@ xraudio_result_t xraudio_input_stop_locked(xraudio_input_obj_t *obj, int32_t ind
    return(XRAUDIO_RESULT_OK);
 }
 
-xraudio_result_t xraudio_input_capture_to_file_start(xraudio_input_object_t object, xraudio_capture_t capture, xraudio_container_t container, const char *audio_file_path, audio_in_callback_t callback, void *param) {
+xraudio_result_t xraudio_input_capture_to_file_start(xraudio_input_object_t object, xraudio_capture_t capture, xraudio_container_t container, const char *audio_file_path, bool raw_mic_enable, audio_in_callback_t callback, void *param) {
    xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
    if(!xraudio_input_object_is_valid(obj)) {
       XLOGD_ERROR("Invalid object.");
@@ -1255,12 +1256,13 @@ xraudio_result_t xraudio_input_capture_to_file_start(xraudio_input_object_t obje
       return(XRAUDIO_RESULT_ERROR_CONTAINER);
    }
 
-   XLOGD_INFO("file <%s> capture <%s> container <%s>", audio_file_path, xraudio_capture_str(capture), xraudio_container_str(container));
+   XLOGD_INFO("file <%s> capture <%s> container <%s> raw_mic_enable <%d>", audio_file_path, xraudio_capture_str(capture), xraudio_container_str(container), raw_mic_enable);
 
    obj->capture.active          = true;
    obj->capture.type            = capture;
    obj->capture.container       = container;
    obj->capture.audio_file_path = audio_file_path;
+   obj->capture.raw_mic_enable  = raw_mic_enable;
 
    return(xraudio_input_dispatch_capture(obj, callback, param));
 }
@@ -1289,6 +1291,7 @@ xraudio_result_t xraudio_input_capture_stop_locked(xraudio_input_obj_t *obj) {
    obj->capture.type            = XRAUDIO_CAPTURE_INPUT_MONO;
    obj->capture.container       = XRAUDIO_CONTAINER_INVALID;
    obj->capture.audio_file_path = NULL;
+   obj->capture.raw_mic_enable  = false;
 
    return(XRAUDIO_RESULT_OK);
 }
@@ -1438,6 +1441,7 @@ xraudio_result_t xraudio_input_dispatch_capture(xraudio_input_obj_t *obj, audio_
    msg.capture_type         = obj->capture.type;
    msg.container            = obj->capture.container;
    msg.audio_file_path      = obj->capture.audio_file_path;
+   msg.raw_mic_enable       = obj->capture.raw_mic_enable;
 
    xraudio_input_queue_msg_push(obj, (const char *)&msg, sizeof(msg));
 

@@ -274,6 +274,7 @@ typedef struct {
    xraudio_capture_t               capture_type;
    xraudio_container_t             container;
    const char *                    audio_file_path;
+   bool                            raw_mic_enable;
 } xraudio_queue_msg_capture_start_t;
 
 typedef struct {

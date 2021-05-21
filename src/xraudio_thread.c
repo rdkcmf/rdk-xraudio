@@ -168,6 +168,7 @@ typedef struct {
    xraudio_capture_point_t output;
    char                    audio_file_path[128];
    xraudio_container_t     container;
+   bool                    raw_mic_enable;
 } xraudio_capture_session_t;
 
 typedef struct {
@@ -1257,6 +1258,7 @@ void xraudio_msg_capture_start(xraudio_thread_state_t *state, void *msg) {
    state->record.capture_session.param           = capture->param;
    state->record.capture_session.container       = capture->container;
    snprintf(state->record.capture_session.audio_file_path, sizeof(state->record.capture_session.audio_file_path), "%s", capture->audio_file_path);
+   state->record.capture_session.raw_mic_enable  = capture->raw_mic_enable;
 
    // Set fh to NULL in case they weren't closed
    for(uint8_t chan = 0; chan < XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY; chan++) {
@@ -1413,8 +1415,17 @@ void xraudio_msg_capture_start(xraudio_thread_state_t *state, void *msg) {
       capture_file->format = format_16k_16bit_mono;
    }
 
+   if(state->record.capture_session.raw_mic_enable) {
+      if(xraudio_hal_input_test_mode(state->params.hal_input_obj, true)) {
+         XLOGD_INFO("hal input set to raw mic test mode");
+      } else {
+         XLOGD_ERROR("unable to set hal input to raw mic test mode");
+         state->record.capture_session.raw_mic_enable = false;
+      }
+   }
+
    if(capture->semaphore == NULL) {
-      XLOGD_ERROR("synchronous start with no sempahore set!");
+      XLOGD_ERROR("synchronous start with no semaphore set!");
    } else {
       sem_post(capture->semaphore);
    }
@@ -1469,8 +1480,17 @@ void xraudio_msg_capture_stop(xraudio_thread_state_t *state, void *msg) {
    state->record.capture_session.callback        = NULL;
    state->record.capture_session.param           = NULL;
 
+   if(state->record.capture_session.raw_mic_enable) {
+      if(xraudio_hal_input_test_mode(state->params.hal_input_obj, false)) {
+         XLOGD_INFO("hal input restored to normal test mode");
+      } else {
+         XLOGD_ERROR("unable to restore hal input to normal test mode");
+      }
+      state->record.capture_session.raw_mic_enable = false;
+   }
+
    if(stop->semaphore == NULL) {
-      XLOGD_ERROR("synchronous stop with no sempahore set!");
+      XLOGD_ERROR("synchronous stop with no semaphore set!");
    } else {
       sem_post(stop->semaphore);
    }

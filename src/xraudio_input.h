@@ -68,7 +68,7 @@ void                    xraudio_input_keyword_detected(xraudio_input_object_t ob
 unsigned char           xraudio_input_signal_level_get(xraudio_input_object_t object, uint8_t chan);
 uint16_t                xraudio_input_signal_direction_get(xraudio_input_object_t object);
 
-xraudio_result_t        xraudio_input_capture_to_file_start(xraudio_input_object_t object, xraudio_capture_t capture, xraudio_container_t container, const char *audio_file_path, audio_in_callback_t callback, void *param);
+xraudio_result_t        xraudio_input_capture_to_file_start(xraudio_input_object_t object, xraudio_capture_t capture, xraudio_container_t container, const char *audio_file_path, bool raw_mic_enable, audio_in_callback_t callback, void *param);
 xraudio_result_t        xraudio_input_capture_stop(xraudio_input_object_t object);
 
 void                    xraudio_input_stats_timestamp_frame_ready(xraudio_input_object_t object, rdkx_timestamp_t timestamp_next);

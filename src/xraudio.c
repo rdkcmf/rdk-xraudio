@@ -1767,7 +1767,7 @@ xraudio_result_t xraudio_stream_stop(xraudio_object_t object, int32_t index) {
    return(result);
 }
 
-xraudio_result_t xraudio_capture_to_file_start(xraudio_object_t object, xraudio_capture_t capture, xraudio_container_t container, const char *audio_file_path, audio_in_callback_t callback, void *param) {
+xraudio_result_t xraudio_capture_to_file_start(xraudio_object_t object, xraudio_capture_t capture, xraudio_container_t container, const char *audio_file_path, bool raw_mic_enable, audio_in_callback_t callback, void *param) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1786,7 +1786,7 @@ xraudio_result_t xraudio_capture_to_file_start(xraudio_object_t object, xraudio_
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_capture_to_file_start(obj->obj_input, capture, container, audio_file_path, callback, param);
+      result = xraudio_input_capture_to_file_start(obj->obj_input, capture, container, audio_file_path, raw_mic_enable, callback, param);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
