@@ -449,7 +449,7 @@ const char *audio_in_callback_event_str(audio_in_callback_event_t type) {
    switch(type) {
       case AUDIO_IN_CALLBACK_EVENT_OK:                  return("OK");
       case AUDIO_IN_CALLBACK_EVENT_EOS:                 return("EOS");
-      case AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_BEGIN:   return("EOS TIMEOUT BEGIN");
+      case AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_INITIAL: return("EOS TIMEOUT INITIAL");
       case AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END:     return("EOS TIMEOUT END");
       case AUDIO_IN_CALLBACK_EVENT_FIRST_FRAME:         return("FIRST FRAME");
       case AUDIO_IN_CALLBACK_EVENT_END_OF_BUFFER:       return("END OF BUFFER");
@@ -628,12 +628,12 @@ const char *xraudio_capabilities_output_str(uint16_t type) {
 
 const char *xraudio_eos_event_str(xraudio_eos_event_t type) {
    switch(type) {
-      case XRAUDIO_EOS_EVENT_NONE:           return("NONE");
-      case XRAUDIO_EOS_EVENT_STARTOFSPEECH:  return("STARTOFSPEECH");
-      case XRAUDIO_EOS_EVENT_ENDOFSPEECH:    return("ENDOFSPEECH");
-      case XRAUDIO_EOS_EVENT_TIMEOUT_BEGIN:  return("TIMEOUT_BEGIN");
-      case XRAUDIO_EOS_EVENT_TIMEOUT_END:    return("TIMEOUT_END");
-      case XRAUDIO_EOS_EVENT_INVALID:        return("INVALID");
+      case XRAUDIO_EOS_EVENT_NONE:            return("NONE");
+      case XRAUDIO_EOS_EVENT_STARTOFSPEECH:   return("STARTOFSPEECH");
+      case XRAUDIO_EOS_EVENT_ENDOFSPEECH:     return("ENDOFSPEECH");
+      case XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL: return("TIMEOUT_INITIAL");
+      case XRAUDIO_EOS_EVENT_TIMEOUT_END:     return("TIMEOUT_END");
+      case XRAUDIO_EOS_EVENT_INVALID:         return("INVALID");
    }
    return(xraudio_invalid_return(type));
 }
@@ -653,7 +653,7 @@ const char *xraudio_ppr_event_str(xraudio_ppr_event_t type) {
       case XRAUDIO_PPR_EVENT_NONE:                       return("NONE");
       case XRAUDIO_PPR_EVENT_STARTOFSPEECH:              return("STARTOFSPEECH");
       case XRAUDIO_PPR_EVENT_ENDOFSPEECH:                return("ENDOFSPEECH");
-      case XRAUDIO_PPR_EVENT_TIMEOUT_BEGIN:              return("TIMEOUT_BEGIN");
+      case XRAUDIO_PPR_EVENT_TIMEOUT_INITIAL:            return("TIMEOUT_INITIAL");
       case XRAUDIO_PPR_EVENT_TIMEOUT_END:                return("TIMEOUT_END");
       case XRAUDIO_PPR_EVENT_LOCAL_KEYWORD_DETECTED:     return("LOCAL_KEYWORD_DETECTED");
       case XRAUDIO_PPR_EVENT_REFERENCE_KEYWORD_DETECTED: return("REFERENCE_KEYWORD_DETECTED");

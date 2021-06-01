@@ -91,7 +91,7 @@ typedef enum {
    XRAUDIO_PPR_EVENT_NONE                       = 0,  ///< No event
    XRAUDIO_PPR_EVENT_STARTOFSPEECH              = 1,  ///< Start of speech was just detected
    XRAUDIO_PPR_EVENT_ENDOFSPEECH                = 2,  ///< End of speech was detected
-   XRAUDIO_PPR_EVENT_TIMEOUT_BEGIN              = 3,  ///< No speech detected within timeout period
+   XRAUDIO_PPR_EVENT_TIMEOUT_INITIAL            = 3,  ///< No speech detected within timeout period
    XRAUDIO_PPR_EVENT_TIMEOUT_END                = 4,  ///< No end of speech detected within timeout period
    XRAUDIO_PPR_EVENT_LOCAL_KEYWORD_DETECTED     = 5,  ///< Keyword has been detected on local mic input/stream
    XRAUDIO_PPR_EVENT_REFERENCE_KEYWORD_DETECTED = 6,  ///< Keyword has been detected in reference stream (TV audio)

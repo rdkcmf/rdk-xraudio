@@ -42,12 +42,12 @@
 /// @details The xraudio EOS api provides enumerated types for logical groups of values.
 
 typedef enum {
-   XRAUDIO_EOS_EVENT_NONE,          ///< No EOS event has occurred
-   XRAUDIO_EOS_EVENT_STARTOFSPEECH, ///< Start of speech was detected
-   XRAUDIO_EOS_EVENT_ENDOFSPEECH,   ///< End of speech was detected
-   XRAUDIO_EOS_EVENT_TIMEOUT_BEGIN, ///< No speech detected within a timeout period whose timer starts when speech begins
-   XRAUDIO_EOS_EVENT_TIMEOUT_END,   ///< No end of speech detected within timeout period whose timer starts when speech begins
-   XRAUDIO_EOS_EVENT_INVALID        ///< An invalid event
+   XRAUDIO_EOS_EVENT_NONE,            ///< No EOS event has occurred
+   XRAUDIO_EOS_EVENT_STARTOFSPEECH,   ///< Start of speech was detected
+   XRAUDIO_EOS_EVENT_ENDOFSPEECH,     ///< End of speech was detected
+   XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL, ///< No speech detected within a timeout period whose timer starts when speech begins
+   XRAUDIO_EOS_EVENT_TIMEOUT_END,     ///< No end of speech detected within timeout period whose timer starts when speech begins
+   XRAUDIO_EOS_EVENT_INVALID          ///< An invalid event
 } xraudio_eos_event_t;
 
 /// @}

@@ -153,7 +153,7 @@ typedef enum {
 typedef enum {
    AUDIO_IN_CALLBACK_EVENT_OK                  = 0, ///< Event to indicate completion of asynchronous operation
    AUDIO_IN_CALLBACK_EVENT_EOS                 = 1, ///< Event to indicate that the end of the stream has been reached
-   AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_BEGIN   = 2, ///< Event to indicate that the end of the stream has been reached. No speech detected within timeout period
+   AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_INITIAL = 2, ///< Event to indicate that the end of the stream has been reached. No speech detected within timeout period
    AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END     = 3, ///< Event to indicate that the end of the stream has been reached. No EOS detected within timeout period
    AUDIO_IN_CALLBACK_EVENT_FIRST_FRAME         = 4, ///< Event to indicate that the first frame has been recorded
    AUDIO_IN_CALLBACK_EVENT_END_OF_BUFFER       = 5, ///< Event to indicate that the end of the record buffer was reached

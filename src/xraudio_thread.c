@@ -2024,9 +2024,9 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
                XLOGD_DEBUG("ppr event: %s", xraudio_ppr_event_str(ppr_event));
             }
             switch(ppr_event) {
-               case XRAUDIO_PPR_EVENT_ENDOFSPEECH:   eos_event_ppr = XRAUDIO_EOS_EVENT_ENDOFSPEECH; break;
-               case XRAUDIO_PPR_EVENT_TIMEOUT_BEGIN: eos_event_ppr = XRAUDIO_EOS_EVENT_TIMEOUT_BEGIN; break;
-               case XRAUDIO_PPR_EVENT_TIMEOUT_END:   eos_event_ppr = XRAUDIO_EOS_EVENT_TIMEOUT_END; break;
+               case XRAUDIO_PPR_EVENT_ENDOFSPEECH:     eos_event_ppr = XRAUDIO_EOS_EVENT_ENDOFSPEECH;     break;
+               case XRAUDIO_PPR_EVENT_TIMEOUT_INITIAL: eos_event_ppr = XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL; break;
+               case XRAUDIO_PPR_EVENT_TIMEOUT_END:     eos_event_ppr = XRAUDIO_EOS_EVENT_TIMEOUT_END;     break;
                case XRAUDIO_PPR_EVENT_NONE:
                case XRAUDIO_PPR_EVENT_STARTOFSPEECH:
                case XRAUDIO_PPR_EVENT_LOCAL_KEYWORD_DETECTED:
@@ -2050,9 +2050,9 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
             }
          }
          switch(eos_event) {
-            case XRAUDIO_EOS_EVENT_ENDOFSPEECH:   event = AUDIO_IN_CALLBACK_EVENT_EOS; break;
-            case XRAUDIO_EOS_EVENT_TIMEOUT_BEGIN: event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_BEGIN; break;
-            case XRAUDIO_EOS_EVENT_TIMEOUT_END:   event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END; break;
+            case XRAUDIO_EOS_EVENT_ENDOFSPEECH:     event = AUDIO_IN_CALLBACK_EVENT_EOS; break;
+            case XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL: event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_INITIAL; break;
+            case XRAUDIO_EOS_EVENT_TIMEOUT_END:     event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END; break;
             case XRAUDIO_EOS_EVENT_NONE:
             case XRAUDIO_EOS_EVENT_STARTOFSPEECH: 
             case XRAUDIO_EOS_EVENT_INVALID:       break;
