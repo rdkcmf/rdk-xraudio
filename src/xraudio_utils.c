@@ -371,7 +371,7 @@ const char *xraudio_main_queue_msg_type_str(xraudio_main_queue_msg_type_t type) 
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL:         return("THREAD_POLL");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE:          return("POWER_MODE");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE:        return("PRIVACY_MODE");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_STREAM_START_SET:    return("STREAM_START_SET");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET:    return("PRIVACY_MODE_GET");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID:             return("INVALID");
    }
    return(xraudio_invalid_return(type));

@@ -379,6 +379,10 @@ xraudio_result_t xraudio_power_mode_update(xraudio_object_t object, xraudio_powe
 /// @details Updates the privacy mode.  This call is synchronous and the new mode is active after the call returns.  if enable is true, privacy mode is enabled.  Otherwise it is disabled.
 xraudio_result_t xraudio_privacy_mode_update(xraudio_object_t object, xraudio_devices_input_t input, bool enable);
 
+/// @brief Gets the xraudio privacy mode
+/// @details Gets the privacy mode. The input parameter is a boolean with true indicating privacy mode is enabled, otherwise it is disabled
+xraudio_result_t xraudio_privacy_mode_get(xraudio_object_t object, xraudio_devices_input_t input, bool *enabled);
+
 // Recording APIs - Synchronous if callback is NULL
 /// @brief Set keyword detection parameters
 /// @details Sets the keyword detection parameters.  The parameters will remain persistent until the xraudio object is destroyed.  The parameters will take effect on the next call to xraudio_keyword_detect.

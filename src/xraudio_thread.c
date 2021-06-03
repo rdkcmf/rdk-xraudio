@@ -444,6 +444,7 @@ static void xraudio_msg_terminate(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_thread_poll(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_power_mode(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_privacy_mode(xraudio_thread_state_t *state, void *msg);
+static void xraudio_msg_privacy_mode_get(xraudio_thread_state_t *state, void *msg);
 
 static void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t frame_duration, uint32_t *frame_size, uint16_t stream_time_minimum, uint32_t *min_audio_data_len);
 static bool xraudio_in_aop_adjust_apply(int32_t *buffer, uint32_t sample_qty_frame, int8_t input_aop_adjust_shift);
@@ -468,7 +469,8 @@ static const xraudio_msg_handler_t g_xraudio_msg_handlers[XRAUDIO_MAIN_QUEUE_MSG
    xraudio_msg_terminate,
    xraudio_msg_thread_poll,
    xraudio_msg_power_mode,
-   xraudio_msg_privacy_mode
+   xraudio_msg_privacy_mode,
+   xraudio_msg_privacy_mode_get
 };
 
 #ifdef MASK_FIRST_WRITE_DELAY
@@ -1855,6 +1857,23 @@ void xraudio_msg_privacy_mode(xraudio_thread_state_t *state, void *msg) {
          *(privacy_mode->result) = result;
       }
       sem_post(privacy_mode->semaphore);
+   }
+}
+
+void xraudio_msg_privacy_mode_get(xraudio_thread_state_t *state, void *msg) {
+   xraudio_main_queue_msg_privacy_mode_get_t *privacy_mode_get = (xraudio_main_queue_msg_privacy_mode_get_t *)msg;
+
+   xraudio_result_t result = XRAUDIO_RESULT_OK;
+   //Call HAL to get mute state
+  if(!xraudio_hal_privacy_mode_get(state->params.hal_obj, privacy_mode_get->enabled)) {
+      result = XRAUDIO_RESULT_ERROR_INTERNAL;
+   }
+
+   if(privacy_mode_get->semaphore != NULL) {
+      if(privacy_mode_get->result != NULL) {
+         *(privacy_mode_get->result) = result;
+      }
+      sem_post(privacy_mode_get->semaphore);
    }
 }
 

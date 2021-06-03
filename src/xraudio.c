@@ -2472,3 +2472,38 @@ xraudio_result_t xraudio_privacy_mode_update(xraudio_object_t object, xraudio_de
    return(result);
 }
 
+xraudio_result_t xraudio_privacy_mode_get(xraudio_object_t object, xraudio_devices_input_t input, bool *enabled) {
+   xraudio_obj_t *obj = (xraudio_obj_t *)object;
+   if(!xraudio_object_is_valid(obj)) {
+      XLOGD_ERROR("Invalid object.");
+      return XRAUDIO_RESULT_ERROR_OBJECT;
+   }
+   if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(input) == XRAUDIO_DEVICE_INPUT_NONE) {
+      XLOGD_ERROR("Invalid input device <%s>", xraudio_devices_input_str(input));
+      return(XRAUDIO_RESULT_ERROR_PARAMS);
+   }
+
+   xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
+   XRAUDIO_API_MUTEX_LOCK();
+
+   sem_t semaphore;
+   sem_init(&semaphore, 0, 0);
+
+   xraudio_main_queue_msg_privacy_mode_get_t msg;
+   msg.header.type = XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET;
+   msg.enabled     = enabled;
+   msg.semaphore   = &semaphore;
+   msg.result      = &result;
+
+   queue_msg_push(obj->msgq_main, (const char*)&msg, sizeof(msg));
+
+   sem_wait(&semaphore);
+   sem_destroy(&semaphore);
+
+   if(result != XRAUDIO_RESULT_OK) {
+      XLOGD_ERROR("unable to get mute state");
+   }
+
+   XRAUDIO_API_MUTEX_UNLOCK();
+   return(result);
+}

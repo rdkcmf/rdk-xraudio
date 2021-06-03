@@ -196,6 +196,7 @@ bool              xraudio_hal_available_devices_get(xraudio_devices_input_t *inp
 xraudio_hal_obj_t xraudio_hal_open(bool debug, xraudio_power_mode_t power_mode, bool privacy_mode, xraudio_hal_msg_callback_t callback);
 bool              xraudio_hal_power_mode(xraudio_hal_obj_t obj, xraudio_power_mode_t power_mode);
 bool              xraudio_hal_privacy_mode(xraudio_hal_obj_t obj, bool enable);
+bool              xraudio_hal_privacy_mode_get(xraudio_hal_obj_t obj, bool *enabled);
 void              xraudio_hal_close(xraudio_hal_obj_t obj);
 bool              xraudio_hal_thread_poll(void);
 

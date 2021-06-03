@@ -101,7 +101,7 @@ typedef enum {
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL                  = 17,
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE                   = 18,
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE                 = 19,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_STREAM_START_SET             = 20,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET             = 20,
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID                      = 21,
 } xraudio_main_queue_msg_type_t;
 
@@ -357,6 +357,13 @@ typedef struct {
    sem_t *                         semaphore;
    xraudio_result_t *              result;
 } xraudio_main_queue_msg_privacy_mode_t;
+
+typedef struct {
+   xraudio_main_queue_msg_header_t header;
+   bool *                          enabled;
+   sem_t *                         semaphore;
+   xraudio_result_t *              result;
+} xraudio_main_queue_msg_privacy_mode_get_t;
 
 #ifdef __cplusplus
 extern "C" {
