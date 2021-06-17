@@ -250,6 +250,8 @@ typedef struct {
    uint32_t                  chan_selected;
    xraudio_kwd_endpoints_t   endpoints;
    xraudio_kwd_chan_result_t channels[XRAUDIO_INPUT_MAX_CHANNEL_QTY];
+   const char *               detector_name;
+   const char *               dsp_name;
 } xraudio_keyword_detector_result_t;
 
 typedef struct {

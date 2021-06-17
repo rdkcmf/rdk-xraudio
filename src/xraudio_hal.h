@@ -131,15 +131,17 @@ typedef struct {
 } xraudio_hal_msg_session_request_t;
 
 typedef struct {
-   bool     valid;
-   int32_t  kwd_pre;
-   int32_t  kwd_begin;
-   int32_t  kwd_end;
+   bool         valid;
+   int32_t      kwd_pre;
+   int32_t      kwd_begin;
+   int32_t      kwd_end;
+   const char * keyword_detector;
+   const char * dsp_name;
 } xraudio_hal_stream_params_t;
 
 typedef struct {
-   xraudio_hal_msg_header_t   header;
-   xraudio_input_format_t     format;
+   xraudio_hal_msg_header_t    header;
+   xraudio_input_format_t      format;
    //Optional field for keyword detect on DSP
    xraudio_hal_stream_params_t stream_params;
 } xraudio_hal_msg_session_begin_t;
@@ -163,10 +165,11 @@ typedef struct {
 } xraudio_device_input_configuration_t;
 
 typedef struct {
-   uint32_t samples_buffered_max;
-   uint32_t samples_lost;
-   float    snr[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
-   uint8_t  vad_confidence[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
+   uint32_t    samples_buffered_max;
+   uint32_t    samples_lost;
+   float       snr[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
+   uint8_t     vad_confidence[XRAUDIO_INPUT_MAX_CHANNEL_QTY + XRAUDIO_INPUT_MAX_CHANNEL_QTY_EC_REF];
+   const char *dsp_name;
 } xraudio_hal_input_stats_t;
 
 typedef struct {

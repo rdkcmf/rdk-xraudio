@@ -137,11 +137,12 @@ typedef enum {
 /// @brief xraudio preprocess status
 /// @details Status information returned by xraudio_dspblock_get_status()
 typedef struct {
-    float snr;
-    float mic_levels_dbfs[XRAUDIO_PPR_MAX_MICS];   ///< Mic levels, specified in dBFS
-    float ref_levels_dbfs[XRAUDIO_PPR_MAX_REFS];   ///< Reference input levels, specified in dBFS
-    float erledb[XRAUDIO_PPR_MAX_MICS];            ///< AEC Echo Return Loss Enhancement (ERLE) values, specified in dB
-    float erldB[XRAUDIO_PPR_MAX_MICS];             ///< Echo Return Loss (ERL) values measured in dB
+    float  snr;
+    float  mic_levels_dbfs[XRAUDIO_PPR_MAX_MICS];   ///< Mic levels, specified in dBFS
+    float  ref_levels_dbfs[XRAUDIO_PPR_MAX_REFS];   ///< Reference input levels, specified in dBFS
+    float  erledb[XRAUDIO_PPR_MAX_MICS];            ///< AEC Echo Return Loss Enhancement (ERLE) values, specified in dB
+    float  erldB[XRAUDIO_PPR_MAX_MICS];             ///< Echo Return Loss (ERL) values measured in dB
+    char * dsp_name;                                 ///< Name of DSP preprocessing in use
 } xraudio_ppr_status_t;
 
 /// @}

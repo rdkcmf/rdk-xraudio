@@ -1745,10 +1745,12 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
                detector_result.channels[ii].snr   = 10.0;
             }
 
-            detector_result.endpoints.valid   = true;
-            detector_result.endpoints.pre     = begin->stream_params.kwd_pre;
-            detector_result.endpoints.begin   = begin->stream_params.kwd_begin;
-            detector_result.endpoints.end     = begin->stream_params.kwd_end;
+            detector_result.endpoints.valid = true;
+            detector_result.endpoints.pre   = begin->stream_params.kwd_pre;
+            detector_result.endpoints.begin = begin->stream_params.kwd_begin;
+            detector_result.endpoints.end   = begin->stream_params.kwd_end;
+            detector_result.detector_name   = begin->stream_params.keyword_detector;
+            detector_result.dsp_name        = begin->stream_params.dsp_name;
          }
 
          //HAL capabilities might change after open(). For example when Llama loads NSM DSP image
@@ -2396,7 +2398,16 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
                if(detector->criterion == XRAUDIO_KWD_CRITERION_SNR) {
                   detector_chan->snr = input_stats.snr[chan];
                }
+               // if hal provided DSP PPR info, send it along
+               if(input_stats.dsp_name != NULL) {
+                  detector->result.dsp_name = input_stats.dsp_name;
+               }
             }
+            //if kwd detector provided detector_name, use it
+            if(detector_chan->endpoints.detector_name != NULL) {
+               detector->result.detector_name = detector_chan->endpoints.detector_name;
+            }
+
             // update channel's results
             detector->result.channels[chan].score = detector_chan->score;
             detector->result.channels[chan].snr   = detector_chan->snr;
@@ -2557,6 +2568,14 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
 
    // Reset frame counter to count frames since keyword detector callback was called
    detector->post_frame_count_callback = 0;
+
+   //If we don't have dsp_name yet then we're running PPR on the CPU so get that info
+   if(detector->result.dsp_name == NULL) {
+      xraudio_input_ppr_info_get(params->obj_input, (char**)&detector->result.dsp_name);
+      if(detector->result.dsp_name == NULL) {
+        XLOGD_WARN("dsp_name NULL");
+      }
+   }
 
    xraudio_keyword_detector_session_event(detector, source, KEYWORD_CALLBACK_EVENT_DETECTED, &detector->result, session->format_in);
 

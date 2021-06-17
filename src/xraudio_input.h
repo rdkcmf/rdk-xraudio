@@ -78,7 +78,7 @@ void                    xraudio_input_stats_timestamp_frame_sound_focus(xraudio_
 void                    xraudio_input_stats_timestamp_frame_process(xraudio_input_object_t object);
 void                    xraudio_input_stats_timestamp_frame_end(xraudio_input_object_t object);
 void                    xraudio_input_stats_playback_status(xraudio_input_object_t object, bool is_active);
-
+void                    xraudio_input_ppr_info_get(xraudio_input_object_t object, char **dsp_name);
 xraudio_hal_input_obj_t xraudio_input_hal_obj_external_get(xraudio_hal_input_obj_t hal_obj_input, xraudio_devices_input_t device, xraudio_input_format_t format, xraudio_device_input_configuration_t *configuration);
 
 const char *xraudio_input_state_str(xraudio_input_state_t type);

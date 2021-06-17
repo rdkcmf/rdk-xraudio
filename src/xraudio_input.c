@@ -128,6 +128,7 @@ typedef struct {
    uint32_t                      stream_keyword_begin;
    uint32_t                      stream_keyword_duration;
    xraudio_hal_dsp_config_t      dsp_config;
+   char *                        dsp_name;
 } xraudio_input_obj_t;
 
 static bool             xraudio_input_object_is_valid(xraudio_input_obj_t *obj);
@@ -235,6 +236,7 @@ xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, ui
    #endif
    #ifdef XRAUDIO_PPR_ENABLED
    obj->obj_ppr                  = xraudio_ppr_object_create(jppr_config);
+
    if(!xraudio_ppr_init(obj->obj_ppr)) {
       XLOGD_ERROR("Preprocess init failed");
       if(obj->obj_ppr != NULL) {
@@ -243,6 +245,10 @@ xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, ui
       free(obj);
       return(NULL);
    }
+
+   xraudio_ppr_status_t ppr_status;
+   xraudio_ppr_get_status(obj->obj_ppr, &ppr_status);
+   obj->dsp_name = ppr_status.dsp_name;
    #endif
    memset(obj->fifo_name, 0, sizeof(obj->fifo_name));
    memset(obj->stream_identifer, 0, sizeof(obj->stream_identifer));
@@ -991,6 +997,7 @@ xraudio_result_t xraudio_input_keyword_detect(xraudio_input_object_t object, key
 
 void xraudio_input_keyword_detected(xraudio_input_object_t object) {
    xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
+
    if(!xraudio_input_object_is_valid(obj)) {
       XLOGD_ERROR("Invalid object.");
       return;
@@ -1621,6 +1628,17 @@ void xraudio_input_stats_playback_status(xraudio_input_object_t object, bool is_
    if(obj->timing_data_current < obj->timing_data_end) {
       obj->timing_data_current++;
    }
+   #endif
+}
+
+void xraudio_input_ppr_info_get(xraudio_input_object_t object, char **dsp_name) {
+   #ifdef XRAUDIO_PPR_ENABLED
+   xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
+   if(!xraudio_input_object_is_valid(obj)) {
+      XLOGD_ERROR("Invalid object.");
+      return;
+   }
+   *dsp_name = obj->dsp_name;
    #endif
 }
 
