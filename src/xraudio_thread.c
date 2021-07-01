@@ -593,7 +593,12 @@ void *xraudio_main_thread(void *param) {
 
    // get xraudio input config for acoustic overload point adjustment (in dB converted to bit shift)
    float aop_adj_config = JSON_FLOAT_VALUE_INPUT_AOP_ADJUST;
-   state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(JSON_FLOAT_VALUE_INPUT_AOP_ADJUST);
+   if(aop_adj_config != state.params.dsp_config.aop_adjust) {
+      XLOGD_INFO("Overriding aop adjust default <%.2f> w/ dsp config value <%.2f>", JSON_FLOAT_VALUE_INPUT_AOP_ADJUST, state.params.dsp_config.aop_adjust);
+      aop_adj_config = state.params.dsp_config.aop_adjust;
+   }
+   state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(aop_adj_config);
+
    if(NULL == state.params.json_obj_input) {
       XLOGD_INFO("parameter json_obj_input is null, using defaults");
    } else {
@@ -603,6 +608,11 @@ void *xraudio_main_thread(void *param) {
          if(aop_adj_config > 0.0 || aop_adj_config < -100.0) {
             XLOGD_INFO("invalid AOC adjustment. using default");
          } else {
+            if (aop_adj_config == JSON_FLOAT_VALUE_INPUT_AOP_ADJUST && aop_adj_config != state.params.dsp_config.aop_adjust) {
+               // If the user changes the full power mode image via config but leaves the default aop value --> we want runtime aop value
+               XLOGD_INFO("Config aop adjust value left as default <%.2f> switching to dsp config value <%.2f>", JSON_FLOAT_VALUE_INPUT_AOP_ADJUST, state.params.dsp_config.aop_adjust);
+               aop_adj_config = state.params.dsp_config.aop_adjust;
+            }
             state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(aop_adj_config);   // convert AOP dB adjustment to bit shift
          }
       } else {

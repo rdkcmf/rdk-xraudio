@@ -178,6 +178,7 @@ typedef struct {
    bool    eos_enabled;
    uint8_t input_asr_max_channel_qty;
    uint8_t input_kwd_max_channel_qty;
+   float   aop_adjust;
 } xraudio_hal_dsp_config_t;
 
 /// @}
