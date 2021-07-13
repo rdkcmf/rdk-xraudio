@@ -99,6 +99,11 @@ typedef enum {
 #define XRAUDIO_CAPS_OUTPUT_OFFLOAD                 (0x0002)      // stream processing within audio hal
 #define XRAUDIO_CAPS_OUTPUT_DIRECT_PCM              (0x0004)      // PCM stream processing within xraudio
 
+// DSP test app support
+#define XRAUDIO_DSP_TESTAPP_FIFO_WR                 "/tmp/xr_dsp_testapp_fifo_wr"   // fifo from dsp test app to audio hal
+#define XRAUDIO_DSP_TESTAPP_FIFO_RD                 "/tmp/xr_dsp_testapp_fifo_rd"   // fifo from audio hal to dsp test app
+#define XRAUDIO_DSP_TESTAPP_MESSAGE_SIZE_MAX        964                             // maximum dsp testapp message char size
+
 /// @}
 
 /// @addtogroup XRAUDIO_HAL_STRUCTS
