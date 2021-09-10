@@ -641,6 +641,7 @@ xraudio_result_t xraudio_open(xraudio_object_t object, xraudio_power_mode_t powe
 
       if(result == XRAUDIO_RESULT_ERROR_MIC_OPEN) {
          XLOGD_ERROR("failed to open microphone");
+         xraudio_audio_hal_close(obj);
          xraudio_input_object_destroy(obj->obj_input);
          XRAUDIO_API_MUTEX_UNLOCK();
          return result;
