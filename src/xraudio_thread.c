@@ -798,13 +798,11 @@ void *xraudio_main_thread(void *param) {
                } else {
                   XLOGD_ERROR("record fd read error <%d>", rc);
                }
-            } else if(val == 0 || val > 200) {
-               XLOGD_ERROR("record fd value out of range <%llu>", val);
             } else {
-               while(val) { // Read more audio data from the microphone interface
+               XLOGD_DEBUG("val <%llu>", val);
+               if(val > 0) {
                   unsigned long timeout;
                   xraudio_process_mic_data(&state.params, &state.record, &timeout);
-                  val--;
                }
             }
          }
