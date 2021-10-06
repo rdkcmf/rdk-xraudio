@@ -2131,6 +2131,7 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
 
       // Flush any partial data
       xraudio_in_flush(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), params, session);
+      session->frame_group_index = 0;
 
       for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
          if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
@@ -2881,6 +2882,7 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
             }
          } else if(flush_audio_data && session->stream_until[index] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_KEYWORD) {
             if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
+               XLOGD_DEBUG("Close write side of pipe to send EOF to read side");
                close(session->fifo_audio_data[index]);
                session->fifo_audio_data[index] = -1;
             }
