@@ -2479,9 +2479,13 @@ xraudio_result_t xraudio_privacy_mode_get(xraudio_object_t object, xraudio_devic
       XLOGD_ERROR("Invalid object.");
       return XRAUDIO_RESULT_ERROR_OBJECT;
    }
-   if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(input) == XRAUDIO_DEVICE_INPUT_NONE) {
-      XLOGD_ERROR("Invalid input device <%s>", xraudio_devices_input_str(input));
+   if(enabled == NULL || input == XRAUDIO_DEVICE_INPUT_NONE) {
+      XLOGD_ERROR("Invalid params - input <%s> enabled <%p>", xraudio_devices_input_str(input), enabled);
       return(XRAUDIO_RESULT_ERROR_PARAMS);
+   }
+   if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(input) == XRAUDIO_DEVICE_INPUT_NONE) {
+      *enabled = false;
+      return(XRAUDIO_RESULT_OK);
    }
 
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;

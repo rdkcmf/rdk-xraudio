@@ -1661,9 +1661,11 @@ void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg) {
    }
    #endif
 
-   if(!xraudio_hal_input_keyword_detector_reset(state->params.hal_input_obj)) {
-      XLOGD_ERROR("unable to reset HAL keyword detector");
-     //Allow internal detector to run
+   if(state->params.hal_input_obj != NULL) {
+      if(!xraudio_hal_input_keyword_detector_reset(state->params.hal_input_obj)) {
+         XLOGD_ERROR("unable to reset HAL keyword detector");
+         //Allow internal detector to run
+     }
    }
    xraudio_keyword_detector_session_arm(&state->record.keyword_detector, detect->callback, detect->param, detect->sensitivity);
 
