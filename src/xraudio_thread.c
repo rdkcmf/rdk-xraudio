@@ -244,6 +244,7 @@ struct xraudio_session_record_t {
    bool                         dynamic_gain_enabled;
    bool                         dynamic_gain_set;
    uint8_t                      dynamic_gain_pcm_bit_qty;
+   int16_t                      hal_kwd_peak_power_dBFS;
    #endif
    uint16_t                     stream_time_minimum;
    xraudio_input_record_from_t  stream_from[XRAUDIO_FIFO_QTY_MAX];
@@ -279,6 +280,7 @@ struct xraudio_session_record_t {
    uint32_t                     external_keyword_end_bytes;
    bool                         keyword_flush;
    int8_t                       input_aop_adjust_shift;
+   float                        input_aop_adjust_dB;
 };
 
 typedef struct {
@@ -589,6 +591,7 @@ void *xraudio_main_thread(void *param) {
    state.record.dynamic_gain_enabled     = true;
    state.record.dynamic_gain_set         = false;
    state.record.dynamic_gain_pcm_bit_qty = 0;
+   state.record.hal_kwd_peak_power_dBFS  = -96;
    #endif
 
    // get xraudio input config for acoustic overload point adjustment (in dB converted to bit shift)
@@ -619,6 +622,7 @@ void *xraudio_main_thread(void *param) {
          XLOGD_INFO("AOP adjust value not found, using default");
       }
    }
+   state.record.input_aop_adjust_dB = aop_adj_config;
    XLOGD_INFO("input AOP adjusted by <%f> dB (shifted right <%d> bits)", aop_adj_config, state.record.input_aop_adjust_shift);
 
    state.record.devices_input          = XRAUDIO_DEVICE_INPUT_NONE;
@@ -1762,6 +1766,17 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
 
          #ifdef XRAUDIO_KWD_ENABLED
          state->record.keyword_detector.active_chan = 0;
+         #endif
+         #ifdef XRAUDIO_DGA_ENABLED
+         state->record.dynamic_gain_set         = true;
+         state->record.hal_kwd_peak_power_dBFS  = begin->stream_params.kwd_peak_power_dBFS;
+         state->record.dynamic_gain_pcm_bit_qty = state->record.pcm_bit_qty;
+
+         // calculate dynamic gain using use keyword peak power measurement from external detector
+         int16_t hal_kwd_peak_power_aop_adjusted = state->record.hal_kwd_peak_power_dBFS - (int16_t)(state->record.input_aop_adjust_dB);
+         XLOGD_INFO("peak power aop adjusted <%d dBFS>, peak power <%d dBFS>, aop_adjust <%d dB>", hal_kwd_peak_power_aop_adjusted, state->record.hal_kwd_peak_power_dBFS, (int16_t)state->record.input_aop_adjust_dB);
+         xraudio_dga_update(state->record.obj_dga, &state->record.dynamic_gain_pcm_bit_qty, hal_kwd_peak_power_aop_adjusted);
+         XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", state->record.pcm_bit_qty, state->record.dynamic_gain_pcm_bit_qty);
          #endif
 
          //xraudio_msg_record_start uses some data from state->record.keyword_detector and it's not in use now so let's borrow

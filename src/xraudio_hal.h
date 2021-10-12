@@ -142,6 +142,7 @@ typedef struct {
    int32_t      kwd_end;
    const char * keyword_detector;
    const char * dsp_name;
+   int16_t      kwd_peak_power_dBFS;
 } xraudio_hal_stream_params_t;
 
 typedef struct {
