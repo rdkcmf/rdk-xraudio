@@ -47,6 +47,7 @@ typedef enum {
    XRAUDIO_EOS_EVENT_ENDOFSPEECH,     ///< End of speech was detected
    XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL, ///< No speech detected within a timeout period whose timer starts when speech begins
    XRAUDIO_EOS_EVENT_TIMEOUT_END,     ///< No end of speech detected within timeout period whose timer starts when speech begins
+   XRAUDIO_EOS_EVENT_END_OF_WAKEWORD, ///< End of wakeword was detected
    XRAUDIO_EOS_EVENT_INVALID          ///< An invalid event
 } xraudio_eos_event_t;
 
