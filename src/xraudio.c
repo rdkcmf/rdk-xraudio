@@ -647,6 +647,8 @@ xraudio_result_t xraudio_open(xraudio_object_t object, xraudio_power_mode_t powe
          return result;
       }
 
+      xraudio_hal_dsp_config_get(&g_xraudio_process.dsp_config);
+
       if(obj->devices_output != XRAUDIO_DEVICE_OUTPUT_NONE) { // Create speaker object
          obj->obj_output = xraudio_output_object_create(g_xraudio_process.hal_obj, obj->user_id, obj->msgq_main, obj->capabilities_playback, g_xraudio_process.dsp_config, obj->json_obj_output);
          xraudio_output_open(obj->obj_output, obj->devices_output, power_mode, obj->resource_id_playback, obj->capabilities_playback);

@@ -596,37 +596,6 @@ void *xraudio_main_thread(void *param) {
    state.record.hal_kwd_peak_power_dBFS  = -96;
    #endif
 
-   // get xraudio input config for acoustic overload point adjustment (in dB converted to bit shift)
-   float aop_adj_config = JSON_FLOAT_VALUE_INPUT_AOP_ADJUST;
-   if(aop_adj_config != state.params.dsp_config.aop_adjust) {
-      XLOGD_INFO("Overriding aop adjust default <%.2f> w/ dsp config value <%.2f>", JSON_FLOAT_VALUE_INPUT_AOP_ADJUST, state.params.dsp_config.aop_adjust);
-      aop_adj_config = state.params.dsp_config.aop_adjust;
-   }
-   state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(aop_adj_config);
-
-   if(NULL == state.params.json_obj_input) {
-      XLOGD_INFO("parameter json_obj_input is null, using defaults");
-   } else {
-      json_t *jaop_adj_config = json_object_get(state.params.json_obj_input, JSON_FLOAT_NAME_INPUT_AOP_ADJUST);
-      if(jaop_adj_config != NULL && json_is_real(jaop_adj_config)) {
-         aop_adj_config = json_real_value(jaop_adj_config);
-         if(aop_adj_config > 0.0 || aop_adj_config < -100.0) {
-            XLOGD_INFO("invalid AOC adjustment. using default");
-         } else {
-            if (aop_adj_config == JSON_FLOAT_VALUE_INPUT_AOP_ADJUST && aop_adj_config != state.params.dsp_config.aop_adjust) {
-               // If the user changes the full power mode image via config but leaves the default aop value --> we want runtime aop value
-               XLOGD_INFO("Config aop adjust value left as default <%.2f> switching to dsp config value <%.2f>", JSON_FLOAT_VALUE_INPUT_AOP_ADJUST, state.params.dsp_config.aop_adjust);
-               aop_adj_config = state.params.dsp_config.aop_adjust;
-            }
-            state.record.input_aop_adjust_shift = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(aop_adj_config);   // convert AOP dB adjustment to bit shift
-         }
-      } else {
-         XLOGD_INFO("AOP adjust value not found, using default");
-      }
-   }
-   state.record.input_aop_adjust_dB = aop_adj_config;
-   XLOGD_INFO("input AOP adjusted by <%f> dB (shifted right <%d> bits)", aop_adj_config, state.record.input_aop_adjust_shift);
-
    state.record.devices_input                = XRAUDIO_DEVICE_INPUT_NONE;
    state.record.eos_event                    = XRAUDIO_EOS_EVENT_NONE;
    state.record.eos_vad_forced               = false;
@@ -715,6 +684,10 @@ void *xraudio_main_thread(void *param) {
    state.playback.first_write_pending        = false;
    state.playback.first_write_complete       = false;
    #endif
+
+   state.record.input_aop_adjust_shift       = XRAUDIO_IN_AOP_ADJ_DB_TO_SHIFT(state.params.dsp_config.aop_adjust);
+   state.record.input_aop_adjust_dB          = state.params.dsp_config.aop_adjust;
+   XLOGD_INFO("input AOP adjusted by <%f> dB (shifted right <%d> bits)", state.record.input_aop_adjust_dB, state.record.input_aop_adjust_shift);
 
    memset(g_frame_silence, 0, sizeof(g_frame_silence));
 
