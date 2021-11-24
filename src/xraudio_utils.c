@@ -633,7 +633,6 @@ const char *xraudio_eos_event_str(xraudio_eos_event_t type) {
       case XRAUDIO_EOS_EVENT_ENDOFSPEECH:     return("ENDOFSPEECH");
       case XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL: return("TIMEOUT_INITIAL");
       case XRAUDIO_EOS_EVENT_TIMEOUT_END:     return("TIMEOUT_END");
-      case XRAUDIO_EOS_EVENT_END_OF_WAKEWORD: return("END_OF_WAKEWORD");
       case XRAUDIO_EOS_EVENT_INVALID:         return("INVALID");
    }
    return(xraudio_invalid_return(type));

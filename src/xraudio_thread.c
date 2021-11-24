@@ -253,8 +253,6 @@ struct xraudio_session_record_t {
    xraudio_keyword_detector_t   keyword_detector;
    xraudio_devices_input_t      devices_input;
    xraudio_eos_event_t          eos_event;
-   bool                         eos_vad_forced;
-   uint32_t                     eos_end_of_wake_word_samples;
    bool                         use_hal_eos;
    bool                         eos_hal_cmd_pending;
    rdkx_timestamp_t             timestamp_next;
@@ -424,7 +422,7 @@ static time_t   xraudio_get_file_timestamp(char *filename);
 
 static int  xraudio_in_capture_session_to_file_int16(xraudio_capture_point_t *capture_point, int16_t *samples, uint32_t sample_qty);
 static int  xraudio_in_capture_session_to_file_int32(xraudio_capture_point_t *capture_point, int32_t *samples, uint32_t sample_qty);
-#if defined(XRAUDIO_KWD_ENABLED) && defined(XRAUDIO_DGA_ENABLED)
+#if defined(XRAUDIO_KWD_ENABLED)
 static int  xraudio_in_capture_session_to_file_float(xraudio_capture_point_t *capture_point, float *samples, uint32_t sample_qty);
 #endif
 
@@ -596,13 +594,11 @@ void *xraudio_main_thread(void *param) {
    state.record.hal_kwd_peak_power_dBFS  = -96;
    #endif
 
-   state.record.devices_input                = XRAUDIO_DEVICE_INPUT_NONE;
-   state.record.eos_event                    = XRAUDIO_EOS_EVENT_NONE;
-   state.record.eos_vad_forced               = false;
-   state.record.eos_end_of_wake_word_samples = 0;
-   state.record.use_hal_eos                  = false;
-   state.record.eos_hal_cmd_pending          = false;
-   state.record.timestamp_next               = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
+   state.record.devices_input       = XRAUDIO_DEVICE_INPUT_NONE;
+   state.record.eos_event           = XRAUDIO_EOS_EVENT_NONE;
+   state.record.use_hal_eos         = false;
+   state.record.eos_hal_cmd_pending = false;
+   state.record.timestamp_next      = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
    memset(state.record.frame_buffer_int16, 0, sizeof(state.record.frame_buffer_int16));
    memset(state.record.frame_buffer_fp32, 0, sizeof(state.record.frame_buffer_fp32));
 
@@ -858,8 +854,6 @@ void xraudio_msg_record_idle_start(xraudio_thread_state_t *state, void *msg) {
    state->record.fifo_audio_data[0]        = -1;
    state->record.fifo_sound_intensity      = -1;
    state->record.eos_event                 = XRAUDIO_EOS_EVENT_NONE;
-   state->record.eos_vad_forced            = false;
-   state->record.eos_end_of_wake_word_samples = 0;
 
    state->record.fd                        = idle_start->fd;
    state->record.format_in                 = idle_start->format;
@@ -1636,8 +1630,6 @@ void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg) {
    state->record.fifo_audio_data[0]        = -1;
    state->record.fifo_sound_intensity      = -1;
    state->record.eos_event                 = XRAUDIO_EOS_EVENT_NONE;
-   state->record.eos_vad_forced            = false;
-   state->record.eos_end_of_wake_word_samples = 0;
 
    #ifdef XRAUDIO_KWD_ENABLED
    // Initialize the session upon receipt of first detect request which contains the sensitivity needed to start the session
@@ -2013,11 +2005,10 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    #endif
 
    for(uint8_t chan = 0; chan < chan_qty_mic; ++chan) {
-      uint32_t sample_qty_chan = session->frame_sample_qty / session->format_in.channel_qty;
-      int16_t scaled_eos_samples[sample_qty_chan]; //declaring buffer here instead of EOS because EOS init doesn't know sample_qty
-      float *frame_buffer_fp32 = &session->frame_buffer_fp32[chan].frames[session->frame_group_index].samples[0];
+     int16_t scaled_eos_samples[session->frame_sample_qty]; //declaring buffer here instead of EOS because EOS init doesn't know sample_qty
+     float *frame_buffer_fp32 = &session->frame_buffer_fp32[chan].frames[session->frame_group_index].samples[0];
 
-      xraudio_eos_event_t eos_event = xraudio_input_eos_run(params->obj_input, chan, frame_buffer_fp32, sample_qty_chan, &scaled_eos_samples[0] );
+      xraudio_eos_event_t eos_event = xraudio_input_eos_run(params->obj_input, chan, frame_buffer_fp32, session->frame_sample_qty, &scaled_eos_samples[0] );
 
       #if defined(XRAUDIO_KWD_ENABLED)
       uint8_t active_chan = (params->dsp_config.input_asr_max_channel_qty == 0) ? session->keyword_detector.active_chan : 0;   // kwd active ("best") channel
@@ -2065,17 +2056,13 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
             case XRAUDIO_EOS_EVENT_ENDOFSPEECH:     event = AUDIO_IN_CALLBACK_EVENT_EOS; break;
             case XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL: event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_INITIAL; break;
             case XRAUDIO_EOS_EVENT_TIMEOUT_END:     event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END; break;
-            case XRAUDIO_EOS_EVENT_END_OF_WAKEWORD: session->eos_vad_forced = false; break;
             case XRAUDIO_EOS_EVENT_NONE:
             case XRAUDIO_EOS_EVENT_STARTOFSPEECH: 
             case XRAUDIO_EOS_EVENT_INVALID:       break;
          }
-         if(session->eos_vad_forced) {
-            session->eos_end_of_wake_word_samples += sample_qty_chan;
-            XLOGD_DEBUG("eos_end_of_wake_word_samples <%u>", session->eos_end_of_wake_word_samples);
-         }
       }
       if(session->capture_session.active && session->capture_session.eos[chan].file.fh) {
+         uint32_t sample_qty_chan = session->frame_sample_qty / session->format_in.channel_qty;
          int rc_cap = xraudio_in_capture_session_to_file_int16(&session->capture_session.eos[chan], &scaled_eos_samples[0], sample_qty_chan);
          if(rc_cap < 0) {
             session->capture_session.active = false;
@@ -2377,9 +2364,7 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
       }
 
       if(detector_chan->triggered) {
-         if(!session->eos_vad_forced) {   // don't increment post frame counts if EOS enabled and looking for end of wake word
-            detector_chan->post_frame_count++;
-         }
+         detector_chan->post_frame_count++;
       } else if(detected) {
          XLOGD_DEBUG("keyword detected for channel <%u> instance <%u>", chan, instance_kwd);
 
@@ -2459,32 +2444,6 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
    if(!all_triggered && detector->post_frame_count_trigger <= KEYWORD_TRIGGER_DETECT_THRESHOLD) {
       // Wait up to N frames for other detectors to fire
       return(0);
-   }
-
-   xraudio_keyword_detector_chan_t *detector_chan = &detector->channels[detector->active_chan];
-
-   // inform EOS detector that keyword was detected for case when extended end of keyword detection IS enabled
-   if(detector->triggered && detector_chan->endpoints.end_of_wuw_ext_enabled){
-      if(session->eos_event == XRAUDIO_EOS_EVENT_END_OF_WAKEWORD) {
-         // EOS reports end of wake word. Adjust end of wakeword result then proceed with reporting keyword detection event
-         detector->result.endpoints.end += session->eos_end_of_wake_word_samples;
-      } else if(session->eos_vad_forced) {
-         // wait to report detection event until end of wake word (vad forced flag is cleared)
-         detector->post_frame_count_trigger--;     // correct for extra count while looping
-         return(0);
-      } else {
-         XLOGD_DEBUG("Keyword detected on chan <%u> instance <<%u>", detector->active_chan, detector->active_chan - first_chan_kwd);
-         xraudio_input_eos_state_set_speech_begin(params->obj_input);
-         xraudio_input_ppr_state_set_speech_begin(params->obj_input);
-         #ifdef XRAUDIO_EOS_ENABLED
-         if(params->dsp_config.eos_enabled && !session->use_hal_eos) {
-            // notify EOS, if enabled, to begin looking for end of wake word (not used for HAL EOS detector)
-            session->eos_vad_forced = true;
-            detector->post_frame_count_trigger--;  // correct for extra count while looping
-            return(0);
-         }
-         #endif
-      }
    }
 
    // Inform the HAL that keyword has been detected
@@ -2568,6 +2527,7 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
    #endif
 
    // Adjust the keyword endpoints based on received audio frames since this channel triggered
+   xraudio_keyword_detector_chan_t *detector_chan = &detector->channels[detector->active_chan];
    int32_t sample_adjustment = detector_chan->post_frame_count * chan_sample_qty;
 
    if(sample_adjustment) {
@@ -2578,8 +2538,8 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
       detector_chan->post_frame_count   = 0;
    }
 
-   // inform EOS detector that keyword was detected for case when extended end of keyword detection IS NOT enabled
-   if((session->keyword_detector.triggered) && !(detector_chan->endpoints.end_of_wuw_ext_enabled)){
+   // inform EOS detector that keyword was detected
+   if (session->keyword_detector.triggered) {
       XLOGD_DEBUG("Keyword detected on chan <%u> instance <<%u>", detector->active_chan, detector->active_chan - first_chan_kwd);
       xraudio_input_eos_state_set_speech_begin(params->obj_input);
       xraudio_input_ppr_state_set_speech_begin(params->obj_input);
@@ -2643,7 +2603,7 @@ int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thre
       frame_group_index = session->external_frame_group_index;
    } else {
       uint8_t chan = 0;
-      #if defined(XRAUDIO_KWD_ENABLED)
+      #if defined(XRAUDIO_KWD_ENABLED) || defined(XRAUDIO_DGA_ENABLED)
       if(params->dsp_config.input_asr_max_channel_qty == 0) {
          chan = session->keyword_detector.active_chan;
       }
@@ -3046,17 +3006,16 @@ void xraudio_keyword_detector_init(xraudio_keyword_detector_t *detector, json_t 
 
       if(chan < detector->input_asr_kwd_channel_qty) {
          xraudio_keyword_detector_chan_t *channel = &detector->channels[chan];
-         channel->triggered                        = false;
-         channel->score                            = 0.0;
-         channel->snr                              = 0.0;
-         channel->endpoints.valid                  = false;
-         channel->endpoints.pre                    = 0;
-         channel->endpoints.begin                  = 0;
-         channel->endpoints.end                    = 0;
-         channel->endpoints.end_of_wuw_ext_enabled = false;
-         channel->pd_sample_qty                    = 0;
-         channel->pd_index_write                   = 0;
-         channel->post_frame_count                 = 0;
+         channel->triggered        = false;
+         channel->score            = 0.0;
+         channel->snr              = 0.0;
+         channel->endpoints.valid  = false;
+         channel->endpoints.pre    = 0;
+         channel->endpoints.begin  = 0;
+         channel->endpoints.end    = 0;
+         channel->pd_sample_qty    = 0;
+         channel->pd_index_write   = 0;
+         channel->post_frame_count = 0;
          memset(channel->pre_detection_buffer_fp32, 0, sizeof(channel->pre_detection_buffer_fp32));
       }
    }
@@ -3102,17 +3061,16 @@ void xraudio_keyword_detector_session_init(xraudio_keyword_detector_t *detector,
 
       if(chan < detector->input_asr_kwd_channel_qty) {
          xraudio_keyword_detector_chan_t *detector_chan = &detector->channels[chan];
-         detector_chan->triggered                        = false;
-         detector_chan->score                            = 0.0;
-         detector_chan->snr                              = 0.0;
-         detector_chan->endpoints.valid                  = false;
-         detector_chan->endpoints.pre                    = 0;
-         detector_chan->endpoints.begin                  = 0;
-         detector_chan->endpoints.end                    = 0;
-         detector_chan->endpoints.end_of_wuw_ext_enabled = false;
-         detector_chan->pd_sample_qty                    = 0;
-         detector_chan->pd_index_write                   = 0;
-         detector_chan->post_frame_count                 = 0;
+         detector_chan->triggered        = false;
+         detector_chan->score            = 0.0;
+         detector_chan->snr              = 0.0;
+         detector_chan->endpoints.valid  = false;
+         detector_chan->endpoints.pre    = 0;
+         detector_chan->endpoints.begin  = 0;
+         detector_chan->endpoints.end    = 0;
+         detector_chan->pd_sample_qty    = 0;
+         detector_chan->pd_index_write   = 0;
+         detector_chan->post_frame_count = 0;
          memset(detector_chan->pre_detection_buffer_fp32, 0, sizeof(detector_chan->pre_detection_buffer_fp32));
       }
    }
@@ -4592,7 +4550,7 @@ int xraudio_in_capture_session_to_file_int16(xraudio_capture_point_t *capture_po
    return(data_size);
 }
 
-#if defined(XRAUDIO_KWD_ENABLED) && defined(XRAUDIO_DGA_ENABLED)
+#if defined(XRAUDIO_KWD_ENABLED)
 int xraudio_in_capture_session_to_file_float(xraudio_capture_point_t *capture_point, float *samples, uint32_t sample_qty) {
    size_t data_size = sample_qty * sizeof(int32_t);
 
