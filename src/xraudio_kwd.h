@@ -80,11 +80,12 @@ typedef enum {
 /// @brief xraudio keyword endpoint structure
 /// @details The keyword endpoint structure returned by keyword result function.
 typedef struct {
-   bool         valid;         ///< true if the endpoint is valid, false otherwise
-   int32_t      pre;           ///< the negative offset in samples from current point to start of buffered audio data
-   int32_t      begin;         ///< the negative offset in samples from current point to the beginning of the keyword
-   int32_t      end;           ///< the negative/positive offset in samples from current point to the end of the keyword
-   const char * detector_name; ///< the name of the keyword detector in use
+   bool         valid;                    ///< true if the endpoint is valid, false otherwise
+   int32_t      pre;                      ///< the negative offset in samples from current point to start of buffered audio data
+   int32_t      begin;                    ///< the negative offset in samples from current point to the beginning of the keyword
+   int32_t      end;                      ///< the negative/positive offset in samples from current point to the end of the keyword
+   const char * detector_name;            ///< the name of the keyword detector in use
+   bool         end_of_wuw_ext_enabled;   ///< true if the detector has enabled extended detection of the end of wakeup word, false if disabled.
 } xraudio_kwd_endpoints_t;
 
 /// @brief xraudio keyword result structure
