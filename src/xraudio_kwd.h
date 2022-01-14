@@ -86,6 +86,7 @@ typedef struct {
    int32_t      end;                      ///< the negative/positive offset in samples from current point to the end of the keyword
    const char * detector_name;            ///< the name of the keyword detector in use
    bool         end_of_wuw_ext_enabled;   ///< true if the detector has enabled extended detection of the end of wakeup word, false if disabled.
+   float        kwd_gain;                 ///< the gain applied to audio at input of keyword detector
 } xraudio_kwd_endpoints_t;
 
 /// @brief xraudio keyword result structure
@@ -94,6 +95,7 @@ typedef struct {
    float    score;
    float    snr;
    uint16_t doa;
+   float    dynamic_gain;
 } xraudio_kwd_chan_result_t;
 
 /// @}

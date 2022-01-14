@@ -78,14 +78,16 @@ void                 xraudio_dga_object_destroy(xraudio_dga_object_t object);
 /// @param[in]
 /// @param[in]
 /// @param[in]
-void                 xraudio_dga_calculate(xraudio_dga_object_t object, uint8_t *pcm_bit_qty, uint32_t frame_qty, const float *samples[], uint32_t sample_qty[]);
+/// @param[out]   gain     Current dynamic gain value
+void                 xraudio_dga_calculate(xraudio_dga_object_t object, uint8_t *pcm_bit_qty, uint32_t frame_qty, const float *samples[], uint32_t sample_qty[], float *gain);
 
 /// @brief Update gain to apply to audio
 /// @details Update gain to apply to audio from an externally provided peak power value
 /// @param[in]    object   Reference to an xraudio DGA object.
 /// @param[inout] pcm bit depth of audio samples to apply gain
 /// @param[in]    peak external keyword detector power in dBFS
-void                 xraudio_dga_update(xraudio_dga_object_t object, uint8_t *pcm_bit_qty, int16_t peak_power);
+/// @param[out]   gain     Current dynamic gain value
+void                 xraudio_dga_update(xraudio_dga_object_t object, uint8_t *pcm_bit_qty, int16_t peak_power, float *gain);
 
 /// @brief Apply gain to audio
 /// @details Apply gain to the audio provided.

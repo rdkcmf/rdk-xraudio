@@ -596,11 +596,13 @@ void *xraudio_main_thread(void *param) {
    state.record.hal_kwd_peak_power_dBFS  = -96;
    #endif
 
-   state.record.devices_input       = XRAUDIO_DEVICE_INPUT_NONE;
-   state.record.eos_event           = XRAUDIO_EOS_EVENT_NONE;
-   state.record.use_hal_eos         = false;
-   state.record.eos_hal_cmd_pending = false;
-   state.record.timestamp_next      = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
+   state.record.devices_input                = XRAUDIO_DEVICE_INPUT_NONE;
+   state.record.eos_event                    = XRAUDIO_EOS_EVENT_NONE;
+   state.record.eos_vad_forced               = false;
+   state.record.eos_end_of_wake_word_samples = 0;
+   state.record.use_hal_eos                  = false;
+   state.record.eos_hal_cmd_pending          = false;
+   state.record.timestamp_next               = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
    memset(state.record.frame_buffer_int16, 0, sizeof(state.record.frame_buffer_int16));
    memset(state.record.frame_buffer_fp32, 0, sizeof(state.record.frame_buffer_fp32));
 
@@ -1729,18 +1731,20 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
             memset(&detector_result, 0, sizeof(xraudio_keyword_detector_result_t));
          } else {
             for(ii=0;ii<XRAUDIO_INPUT_MAX_CHANNEL_QTY;ii++) {
-               detector_result.chan_selected      = 0;
-               detector_result.channels[ii].doa   = 0;
-               detector_result.channels[ii].score = 1.0;
-               detector_result.channels[ii].snr   = 10.0;
+               detector_result.chan_selected             = 0;
+               detector_result.channels[ii].doa          = 0;
+               detector_result.channels[ii].score        = 1.0;
+               detector_result.channels[ii].snr          = 10.0;
+               detector_result.channels[ii].dynamic_gain = 0.0;
             }
 
-            detector_result.endpoints.valid = true;
-            detector_result.endpoints.pre   = begin->stream_params.kwd_pre;
-            detector_result.endpoints.begin = begin->stream_params.kwd_begin;
-            detector_result.endpoints.end   = begin->stream_params.kwd_end;
-            detector_result.detector_name   = begin->stream_params.keyword_detector;
-            detector_result.dsp_name        = begin->stream_params.dsp_name;
+            detector_result.endpoints.valid     = true;
+            detector_result.endpoints.pre       = begin->stream_params.kwd_pre;
+            detector_result.endpoints.begin     = begin->stream_params.kwd_begin;
+            detector_result.endpoints.end       = begin->stream_params.kwd_end;
+            detector_result.detector_name       = begin->stream_params.keyword_detector;
+            detector_result.dsp_name            = begin->stream_params.dsp_name;
+            detector_result.endpoints.kwd_gain  = begin->stream_params.dsp_kwd_gain;
          }
 
          #ifdef XRAUDIO_KWD_ENABLED
@@ -1754,7 +1758,10 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
          // calculate dynamic gain using use keyword peak power measurement from external detector
          int16_t hal_kwd_peak_power_aop_adjusted = state->record.hal_kwd_peak_power_dBFS - (int16_t)(state->record.input_aop_adjust_dB);
          XLOGD_INFO("peak power aop adjusted <%d dBFS>, peak power <%d dBFS>, aop_adjust <%d dB>", hal_kwd_peak_power_aop_adjusted, state->record.hal_kwd_peak_power_dBFS, (int16_t)state->record.input_aop_adjust_dB);
-         xraudio_dga_update(state->record.obj_dga, &state->record.dynamic_gain_pcm_bit_qty, hal_kwd_peak_power_aop_adjusted);
+         float dynamic_gain;
+         xraudio_dga_update(state->record.obj_dga, &state->record.dynamic_gain_pcm_bit_qty, hal_kwd_peak_power_aop_adjusted, &dynamic_gain);
+         dynamic_gain -= state->record.input_aop_adjust_dB;
+         detector_result.channels[state->record.keyword_detector.active_chan].dynamic_gain = dynamic_gain;
          XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", state->record.pcm_bit_qty, state->record.dynamic_gain_pcm_bit_qty);
          #endif
 
@@ -2558,7 +2565,10 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
          uint32_t  frame_qty = (samples[0] != NULL) + (samples[1] != NULL);
 
          session->dynamic_gain_pcm_bit_qty = session->pcm_bit_qty;
-         xraudio_dga_calculate(session->obj_dga, &session->dynamic_gain_pcm_bit_qty, frame_qty, (const float **)samples, sample_qty);
+         float dynamic_gain;
+         xraudio_dga_calculate(session->obj_dga, &session->dynamic_gain_pcm_bit_qty, frame_qty, (const float **)samples, sample_qty, &dynamic_gain);
+         dynamic_gain -= session->input_aop_adjust_dB;
+         detector->result.channels[detector->active_chan].dynamic_gain = dynamic_gain;
          XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", session->pcm_bit_qty, session->dynamic_gain_pcm_bit_qty);
       }
    }
@@ -2596,6 +2606,9 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
         XLOGD_WARN("dsp_name NULL");
       }
    }
+
+   // include AOP adjustment in the reported keyword detector gain
+   detector->result.endpoints.kwd_gain -= session->input_aop_adjust_dB;
 
    xraudio_keyword_detector_session_event(detector, source, KEYWORD_CALLBACK_EVENT_DETECTED, &detector->result, session->format_in);
 
@@ -2640,7 +2653,7 @@ int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thre
       frame_group_index = session->external_frame_group_index;
    } else {
       uint8_t chan = 0;
-      #if defined(XRAUDIO_KWD_ENABLED) || defined(XRAUDIO_DGA_ENABLED)
+      #if defined(XRAUDIO_KWD_ENABLED)
       if(params->dsp_config.input_asr_max_channel_qty == 0) {
          chan = session->keyword_detector.active_chan;
       }
@@ -3037,9 +3050,10 @@ void xraudio_keyword_detector_init(xraudio_keyword_detector_t *detector, json_t 
    detector->criterion                 = XRAUDIO_KWD_CRITERION_INVALID;
 
    for(uint8_t chan = 0; chan < XRAUDIO_INPUT_MAX_CHANNEL_QTY; chan++) {
-      detector->result.channels[chan].score = -1.0;
-      detector->result.channels[chan].snr   =  0.0;
-      detector->result.channels[chan].doa   =    0;
+      detector->result.channels[chan].score        = -1.0;
+      detector->result.channels[chan].snr          =  0.0;
+      detector->result.channels[chan].doa          =    0;
+      detector->result.channels[chan].dynamic_gain =  0.0;
 
       if(chan < detector->input_asr_kwd_channel_qty) {
          xraudio_keyword_detector_chan_t *channel = &detector->channels[chan];
@@ -3051,6 +3065,7 @@ void xraudio_keyword_detector_init(xraudio_keyword_detector_t *detector, json_t 
          channel->endpoints.begin                  = 0;
          channel->endpoints.end                    = 0;
          channel->endpoints.end_of_wuw_ext_enabled = false;
+         channel->endpoints.kwd_gain               = 0.0;
          channel->pd_sample_qty                    = 0;
          channel->pd_index_write                   = 0;
          channel->post_frame_count                 = 0;
@@ -3093,9 +3108,10 @@ void xraudio_keyword_detector_session_init(xraudio_keyword_detector_t *detector,
    }
 
    for(uint8_t chan = 0; chan < XRAUDIO_INPUT_MAX_CHANNEL_QTY; chan++) {
-      detector->result.channels[chan].score = -1.0;
-      detector->result.channels[chan].snr   =  0.0;
-      detector->result.channels[chan].doa   =    0;
+      detector->result.channels[chan].score        = -1.0;
+      detector->result.channels[chan].snr          =  0.0;
+      detector->result.channels[chan].doa          =    0;
+      detector->result.channels[chan].dynamic_gain =  0.0;
 
       if(chan < detector->input_asr_kwd_channel_qty) {
          xraudio_keyword_detector_chan_t *detector_chan = &detector->channels[chan];
@@ -3107,6 +3123,7 @@ void xraudio_keyword_detector_session_init(xraudio_keyword_detector_t *detector,
          detector_chan->endpoints.begin                  = 0;
          detector_chan->endpoints.end                    = 0;
          detector_chan->endpoints.end_of_wuw_ext_enabled = false;
+         detector_chan->endpoints.kwd_gain               = 0.0;
          detector_chan->pd_sample_qty                    = 0;
          detector_chan->pd_index_write                   = 0;
          detector_chan->post_frame_count                 = 0;
@@ -3170,19 +3187,21 @@ void xraudio_keyword_detector_session_arm(xraudio_keyword_detector_t *detector, 
    detector->active_chan               = 0;
 
    for(uint8_t chan = 0; chan < XRAUDIO_INPUT_MAX_CHANNEL_QTY; chan++) {
-      detector->result.channels[chan].score = -1.0;
-      detector->result.channels[chan].snr   =  0.0;
-      detector->result.channels[chan].doa   =    0;
+      detector->result.channels[chan].score        = -1.0;
+      detector->result.channels[chan].snr          =  0.0;
+      detector->result.channels[chan].doa          =    0;
+      detector->result.channels[chan].dynamic_gain =  0.0;
 
       if(chan < detector->input_asr_kwd_channel_qty) {
          xraudio_keyword_detector_chan_t *detector_chan = &detector->channels[chan];
-         detector_chan->triggered        = false;
-         detector_chan->score            = 0.0;
-         detector_chan->snr              = 0.0;
-         detector_chan->endpoints.valid  = false;
-         detector_chan->endpoints.pre    = 0;
-         detector_chan->endpoints.begin  = 0;
-         detector_chan->endpoints.end    = 0;
+         detector_chan->triggered            = false;
+         detector_chan->score                = 0.0;
+         detector_chan->snr                  = 0.0;
+         detector_chan->endpoints.valid      = false;
+         detector_chan->endpoints.pre        = 0;
+         detector_chan->endpoints.begin      = 0;
+         detector_chan->endpoints.end        = 0;
+         detector_chan->endpoints.kwd_gain   = 0.0;
 
          detector_chan->post_frame_count = 0;
       }
