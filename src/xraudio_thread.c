@@ -1086,6 +1086,10 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
          xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
+      } else if(encoding_in == XRAUDIO_ENCODING_OPUS && encoding_out == XRAUDIO_ENCODING_PCM) {
+         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
+         decoding = true;
       } else {
          xraudio_encoding_parameters_get(&state->record.external_format, frame_duration, &state->record.external_frame_size_in, state->record.stream_time_minimum, &state->record.external_data_len_min);
          state->record.external_frame_size_out = state->record.external_frame_size_in;
@@ -4188,7 +4192,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
                   }
                   capture_file = &session->capture_internal.decoded;
                }
-               bytes_read = xraudio_opus_decode(decoders->opus, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_OPUS_FRAME_SAMPLE_QTY);
+               bytes_read = xraudio_opus_decode(decoders->opus, 1, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_OPUS_FRAME_SAMPLE_QTY); // decode framed audio
                if(bytes_read < 0) {
                   XLOGD_ERROR("failed to decode opus");
                } else {
@@ -4205,6 +4209,43 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             if(bytes_read > 0) {
                bytes_read = xraudio_opus_deframe(decoders->opus, inbuf, bytes_read);
             }
+         } else {
+            XLOGD_ERROR("unsupported conversion <%s> to <%s>", xraudio_encoding_str(enc_input), xraudio_encoding_str(enc_output));
+            return;
+         }
+         break;
+      }
+      case XRAUDIO_ENCODING_OPUS: {
+         if(enc_output == XRAUDIO_ENCODING_PCM) {
+            if(decoders->opus == NULL) {
+               XLOGD_ERROR("OPUS decoder is disabled");
+               return;
+            }
+            #ifndef XRAUDIO_DECODE_OPUS
+            XLOGD_ERROR("OPUS decode is not supported");
+            return;
+            #else
+            uint8_t buffer[XRAUDIO_INPUT_OPUS_BUFFER_SIZE] = {'\0'};
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_OPUS_BUFFER_SIZE, NULL);
+            if(bytes_read > 0) {
+               if(session->capture_internal.active) {
+                  int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
+                  if(rc_cap < 0) {
+                     xraudio_in_capture_internal_end(&session->capture_internal);
+                  }
+                  capture_file = &session->capture_internal.decoded;
+               }
+               bytes_read = xraudio_opus_decode(decoders->opus, 0, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_OPUS_FRAME_SAMPLE_QTY); // decode audio (not framed)
+               if(bytes_read < 0) {
+                  XLOGD_ERROR("failed to decode opus");
+               } else {
+                  // Accept any frame size from opus stream since  we can't reliably know the expected frame size
+                  session->external_frame_size_out = bytes_read;
+               }
+            }
+            #endif
+         } else if(enc_output == XRAUDIO_ENCODING_OPUS) {
+            bytes_read = xraudio_hal_input_read(session->external_obj_hal, inbuf, inlen, NULL);
          } else {
             XLOGD_ERROR("unsupported conversion <%s> to <%s>", xraudio_encoding_str(enc_input), xraudio_encoding_str(enc_output));
             return;
