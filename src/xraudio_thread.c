@@ -2245,7 +2245,10 @@ void xraudio_unpack_mono_int32(xraudio_session_record_t *session, void *buffer_i
    int32_t *buffer_in_int32 = (int32_t *)buffer_in;
 
    //XLOGD_DEBUG("group <%u> sample qty frame <%u>", frame_group_index, sample_qty_frame);
-   xraudio_in_aop_adjust_apply(buffer_in_int32, sample_qty_frame, session->input_aop_adjust_shift);
+
+   if(!session->capture_session.raw_mic_enable) {
+      xraudio_in_aop_adjust_apply(buffer_in_int32, sample_qty_frame, session->input_aop_adjust_shift);
+   }
 
    int16_t *buffer_out_int16 = &audio_group_int16->frames[frame_group_index].samples[0];
    float *  buffer_out_fp32  = &audio_group_fp32->frames[frame_group_index].samples[0];
