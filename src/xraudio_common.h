@@ -137,13 +137,14 @@ typedef enum {
 /// @details The encoding enumeration indicates all the valid audio encoding types which may be supported by xraudio.
 typedef enum {
    XRAUDIO_ENCODING_PCM       = 0, ///< PCM encoding (16-bit integer little endian)
-   XRAUDIO_ENCODING_MP3       = 1, ///< MP3 encoding is specified
-   XRAUDIO_ENCODING_ADPCM_XVP = 2, ///< ADPCM encoding (with XVP framing)
-   XRAUDIO_ENCODING_ADPCM_SKY = 3, ///< ADPCM encoding (with SKY framing)
-   XRAUDIO_ENCODING_ADPCM     = 4, ///< ADPCM encoding (standard)
-   XRAUDIO_ENCODING_OPUS_XVP  = 5, ///< OPUS encoding (with XVP framing)
-   XRAUDIO_ENCODING_OPUS      = 6, ///< OPUS encoding (standard)
-   XRAUDIO_ENCODING_INVALID   = 7, ///< Invalid encoding
+   XRAUDIO_ENCODING_PCM_RAW   = 1, ///< Raw unprocessed PCM encoding (32-bit integer little endian)
+   XRAUDIO_ENCODING_MP3       = 2, ///< MP3 encoding is specified
+   XRAUDIO_ENCODING_ADPCM_XVP = 3, ///< ADPCM encoding (with XVP framing)
+   XRAUDIO_ENCODING_ADPCM_SKY = 4, ///< ADPCM encoding (with SKY framing)
+   XRAUDIO_ENCODING_ADPCM     = 5, ///< ADPCM encoding (standard)
+   XRAUDIO_ENCODING_OPUS_XVP  = 6, ///< OPUS encoding (with XVP framing)
+   XRAUDIO_ENCODING_OPUS      = 7, ///< OPUS encoding (standard)
+   XRAUDIO_ENCODING_INVALID   = 8, ///< Invalid encoding
 } xraudio_encoding_t;
 
 /// @brief xraudio interval type

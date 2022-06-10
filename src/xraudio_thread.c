@@ -283,6 +283,10 @@ struct xraudio_session_record_t {
    bool                         keyword_flush;
    int8_t                       input_aop_adjust_shift;
    float                        input_aop_adjust_dB;
+   bool                         raw_mic_enable;
+   uint32_t                     raw_mic_frame_skip;
+   uint8_t *                    raw_mic_frame_ptr;
+   uint32_t                     raw_mic_frame_size;
 };
 
 typedef struct {
@@ -691,6 +695,9 @@ void *xraudio_main_thread(void *param) {
    state.record.input_aop_adjust_dB          = state.params.dsp_config.aop_adjust;
    XLOGD_INFO("input AOP adjusted by <%f> dB (shifted right <%d> bits)", state.record.input_aop_adjust_dB, state.record.input_aop_adjust_shift);
 
+   state.record.raw_mic_enable     = false;
+   state.record.raw_mic_frame_skip = 0;
+
    memset(g_frame_silence, 0, sizeof(g_frame_silence));
 
    state.running        = true;
@@ -1000,6 +1007,10 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
       }
       case XRAUDIO_INPUT_RECORD_FROM_KEYWORD_END: {
          state->record.pre_detection_sample_qty = 0 - offset;
+
+         if(!state->record.keyword_detector.triggered) { // session was initiated without keyword detected
+            state->record.keyword_detector.post_frame_count_callback = 0;
+         }
          break;
       }
       default: {
@@ -1045,6 +1056,7 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
    state->record.external_frame_bytes_read  = 0;
    state->record.external_frame_group_index = 0;
    state->record.keyword_flush              = false;
+   state->record.raw_mic_frame_skip         = 0;
 
    bool decoding = false;
    bool external = false;
@@ -1132,6 +1144,20 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
          }
       }
       #endif
+
+      if(state->record.format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) { // Set raw mic mode
+         if(xraudio_hal_input_test_mode(state->params.hal_input_obj, true)) {
+            XLOGD_INFO("hal input set to raw mic test mode");
+            state->record.raw_mic_enable = true;
+         } else {
+            XLOGD_ERROR("unable to set hal input to raw mic test mode");
+         }
+         // Need to wait until non-raw audio frames have been read by xraudio before servicing the record request
+         state->record.raw_mic_frame_skip = 3;
+
+         // Must use only 1 frame in a group because raw audio is not buffered
+         state->record.frame_group_qty = 1;
+      }
    }
 
    XLOGD_DEBUG("internal capture <%s>", (state->record.capture_internal.enabled ? "enabled" : "disabled"));
@@ -1209,6 +1235,15 @@ void xraudio_msg_record_stop(xraudio_thread_state_t *state, void *msg) {
 
       if(state->record.capture_internal.active) {
          xraudio_in_capture_internal_end(&state->record.capture_internal);
+      }
+
+      if(state->record.raw_mic_enable) { // Clear raw mic mode
+         if(xraudio_hal_input_test_mode(state->params.hal_input_obj, false)) {
+            XLOGD_INFO("hal input restored to normal test mode");
+         } else {
+            XLOGD_ERROR("unable to restore hal input to normal test mode");
+         }
+         state->record.raw_mic_enable = false;
       }
    }
 
@@ -2128,6 +2163,10 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    xraudio_input_stats_timestamp_frame_sound_focus(params->obj_input);
 
    if(session->record_callback) { // Recording
+
+      session->raw_mic_frame_ptr  = mic_frame_data;
+      session->raw_mic_frame_size = mic_frame_size;
+
       rc = session->record_callback(session->source, params, session);
    }
 
@@ -2271,7 +2310,7 @@ void xraudio_unpack_mono_int32(xraudio_session_record_t *session, void *buffer_i
 
    //XLOGD_DEBUG("group <%u> sample qty frame <%u>", frame_group_index, sample_qty_frame);
 
-   if(!session->capture_session.raw_mic_enable) {
+   if(!session->capture_session.raw_mic_enable && !session->raw_mic_enable) {
       xraudio_in_aop_adjust_apply(buffer_in_int32, sample_qty_frame, session->input_aop_adjust_shift);
    }
 
@@ -2917,65 +2956,79 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
    }
 
    if(frame_group_index >= session->frame_group_qty || flush_audio_data) {
-      size_t data_size_int16 = frame_size_int16 * frame_group_index;
+      if(session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW && session->raw_mic_frame_skip > 0) {
+         session->raw_mic_frame_skip--;
+      } else {
+         size_t data_size;
+         void * data_ptr;
 
-      #ifdef XRAUDIO_DGA_ENABLED
-      if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
-         uint32_t sample_qty = data_size_int16 / sizeof(int16_t);
-         float frame_buffer_temp[sample_qty];
+         if(session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) {
+            data_size = session->raw_mic_frame_size;
+            data_ptr  = session->raw_mic_frame_ptr;
+         } else {
+            data_size = frame_size_int16 * frame_group_index;
+            data_ptr  = frame_buffer_int16;
 
-         // make a copy of the audio because dga will modify the audio, and it's still needed for later stages
-         for(uint32_t index = 0; index < sample_qty; index++) {
-            frame_buffer_temp[index] = frame_buffer_fp32[index];
-         }
-         // Apply gain to group of audio frames
-         xraudio_dga_apply(session->obj_dga, frame_buffer_temp, sample_qty);
-         // Convert float to int16
-         xraudio_samples_convert_fp32_int16(frame_buffer_int16, frame_buffer_temp, sample_qty, session->dynamic_gain_pcm_bit_qty);
-      }
-      #endif
+            #ifdef XRAUDIO_DGA_ENABLED
+            if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
+               uint32_t sample_qty = data_size / sizeof(int16_t);
+               float frame_buffer_temp[sample_qty];
 
-      for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-         //XLOGD_DEBUG("streaming channel %d", chan);
-         if(session->fifo_audio_data[index] < 0) {
-            break;
-         }
-         errno = 0;
-         rc = write(session->fifo_audio_data[index], frame_buffer_int16, data_size_int16);
-
-         if(rc != (int)(data_size_int16)) {
-            int errsv = errno;
-            if(errsv == EAGAIN || errsv == EWOULDBLOCK) {
-               // Data is lost due to insufficient space in the pipe
-               rc = 0;
-               if(session->callback != NULL){
-                  (*session->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, session->param);
+               // make a copy of the audio because dga will modify the audio, and it's still needed for later stages
+               for(uint32_t index = 0; index < sample_qty; index++) {
+                  frame_buffer_temp[index] = frame_buffer_fp32[index];
                }
-            } else {
-               XLOGD_ERROR("unable to write fifo %d <%s>", session->fifo_audio_data[index], strerror(errsv));
+               // Apply gain to group of audio frames
+               xraudio_dga_apply(session->obj_dga, frame_buffer_temp, sample_qty);
+               // Convert float to int16
+               xraudio_samples_convert_fp32_int16(frame_buffer_int16, frame_buffer_temp, sample_qty, session->dynamic_gain_pcm_bit_qty);
             }
-         } else if(flush_audio_data && session->stream_until[index] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_KEYWORD) {
-            if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
-               XLOGD_DEBUG("Close write side of pipe to send EOF to read side");
-               close(session->fifo_audio_data[index]);
-               session->fifo_audio_data[index] = -1;
+            #endif
+         }
+
+         for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
+            //XLOGD_DEBUG("streaming channel %d", chan);
+            if(session->fifo_audio_data[index] < 0) {
+               break;
             }
-            session->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
-         }
-      }
-      if(session->capture_session.active && session->capture_session.output.file.fh) {
-         uint32_t sample_qty = data_size_int16 / sizeof(int16_t);
+            
+            errno = 0;
+            rc = write(session->fifo_audio_data[index], data_ptr, data_size);
 
-         int rc_cap = xraudio_in_capture_session_to_file_int16(&session->capture_session.output, frame_buffer_int16, sample_qty);
-         if(rc_cap < 0) {
-            session->capture_session.active = false;
+            if(rc != (int)(data_size)) {
+               int errsv = errno;
+               if(errsv == EAGAIN || errsv == EWOULDBLOCK) {
+                  // Data is lost due to insufficient space in the pipe
+                  rc = 0;
+                  if(session->callback != NULL){
+                     (*session->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, session->param);
+                  }
+               } else {
+                  XLOGD_ERROR("unable to write fifo %d <%s>", session->fifo_audio_data[index], strerror(errsv));
+               }
+            } else if(flush_audio_data && session->stream_until[index] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_KEYWORD) {
+               if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
+                  XLOGD_DEBUG("Close write side of pipe to send EOF to read side");
+                  close(session->fifo_audio_data[index]);
+                  session->fifo_audio_data[index] = -1;
+               }
+               session->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+            }
          }
-      }
+         if(session->capture_session.active && session->capture_session.output.file.fh) {
+            uint32_t sample_qty = data_size / sizeof(int16_t);
 
-      if(session->capture_internal.active && (session->external_format.encoding == session->format_out.encoding)) {
-         int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)frame_buffer_int16, data_size_int16, &session->capture_internal.native);
-         if(rc_cap < 0) {
-            xraudio_in_capture_internal_end(&session->capture_internal);
+            int rc_cap = xraudio_in_capture_session_to_file_int16(&session->capture_session.output, data_ptr, sample_qty);
+            if(rc_cap < 0) {
+               session->capture_session.active = false;
+            }
+         }
+
+         if(session->capture_internal.active && (session->external_format.encoding == (session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) ? XRAUDIO_ENCODING_PCM : session->format_out.encoding)) {
+            int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)data_ptr, data_size, &session->capture_internal.native);
+            if(rc_cap < 0) {
+               xraudio_in_capture_internal_end(&session->capture_internal);
+            }
          }
       }
    }
@@ -3898,14 +3951,60 @@ int xraudio_in_capture_internal_to_file(xraudio_session_record_t *session, uint8
       }
    }
 
-   // Write requested size into capture file
-   size_t bytes_written = fwrite(data_in, 1, data_size, capture_file->fh);
+   if(capture_file->format.channel_qty == 1 && capture_file->format.sample_size == 2) { // single channel 16-bit PCM
+      // Write requested size into capture file
+      size_t bytes_written = fwrite(data_in, 1, data_size, capture_file->fh);
 
-   if(bytes_written != data_size) {
-      XLOGD_ERROR("Error (%zd)", bytes_written);
+      if(bytes_written != data_size) {
+         XLOGD_ERROR("Error (%zd)", bytes_written);
+         return(-1);
+      }
+      capture_file->audio_data_size += data_size;
+   } else if(capture_file->format.sample_size == 4) { // single/multi channel 32-bit PCM
+      uint32_t sample_qty  = data_size / (capture_file->format.sample_size * capture_file->format.channel_qty);
+      uint8_t  channel_qty = capture_file->format.channel_qty;
+      uint32_t sample_size = (capture_file->format.container = XRAUDIO_CONTAINER_WAV) ? 3: 4; // Must reduce to 24-bit for wave format
+
+      for(uint32_t index = 0; index < sample_qty; index++) {
+         uint32_t data_size = channel_qty * sample_size;
+         uint8_t  tmp_buf[data_size];
+         uint32_t j = 0;
+         for(uint32_t mic = 0; mic < channel_qty; mic++) {
+            int32_t (*audio_frames)[sample_qty] = (void *)data_in;
+
+            int32_t sample = audio_frames[mic][index];
+
+            // Handle endian difference for wave container
+            #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            tmp_buf[j++] = (sample >> 24) & 0xFF;
+            tmp_buf[j++] = (sample >> 16) & 0xFF;
+            tmp_buf[j++] = (sample >>  8) & 0xFF;
+            if(sample_size == 4) {
+               tmp_buf[j++] = (sample   ) & 0xFF;
+            }
+            #elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            if(sample_size == 4) {
+               tmp_buf[j++] = (sample   ) & 0xFF;
+            }
+            tmp_buf[j++] = (sample >>  8) & 0xFF;
+            tmp_buf[j++] = (sample >> 16) & 0xFF;
+            tmp_buf[j++] = (sample >> 24) & 0xFF;
+            #else
+            #error unhandled byte order
+            #endif
+         }
+
+         size_t bytes_written = fwrite(&tmp_buf[0], 1, data_size, capture_file->fh);
+
+         if(bytes_written != data_size) {
+            XLOGD_ERROR("Error (%zd)", bytes_written);
+         }
+         capture_file->audio_data_size += data_size;
+      }
+   } else {
+      XLOGD_ERROR("unsupported format");
       return(-1);
    }
-   capture_file->audio_data_size += data_size;
    return(0);
 }
 

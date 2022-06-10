@@ -703,10 +703,10 @@ xraudio_result_t xraudio_input_stream_to_pipe(xraudio_input_object_t object, xra
    }
    XRAUDIO_RECORD_MUTEX_LOCK();
 
-   // Check if object contains this source
-   // Streaming only supports SINGLE channel devices. Others may be supported later.
-   if(!XRAUDIO_DEVICE_INPUT_CONTAINS(obj->device, source) && (XRAUDIO_DEVICE_INPUT_LOCAL_GET(source) != XRAUDIO_DEVICE_INPUT_SINGLE)) {
-      XLOGD_ERROR("invalid source");
+   // Check if object contains this source (or SINGLE is requested when TRI or QUAD is available)
+   if(!XRAUDIO_DEVICE_INPUT_CONTAINS(obj->device, source) && !((source == XRAUDIO_DEVICE_INPUT_SINGLE) && (obj->device & (XRAUDIO_DEVICE_INPUT_TRI | XRAUDIO_DEVICE_INPUT_QUAD)))) {
+      XLOGD_ERROR("invalid source <%s>", xraudio_devices_input_str(source));
+      XLOGD_ERROR("valid sources  <%s>", xraudio_devices_input_str(obj->device));
       XRAUDIO_RECORD_MUTEX_UNLOCK();
       return(XRAUDIO_RESULT_ERROR_INPUT);
    }
@@ -786,8 +786,10 @@ xraudio_result_t xraudio_input_stream_to_pipe(xraudio_input_object_t object, xra
 
    xraudio_input_sound_intensity_fifo_open(obj);
 
-   obj->format_out.container = XRAUDIO_CONTAINER_NONE;
-   obj->format_out.encoding  = XRAUDIO_ENCODING_PCM;
+   obj->format_out.container   = XRAUDIO_CONTAINER_NONE;
+   obj->format_out.encoding    = XRAUDIO_ENCODING_PCM;
+   obj->format_out.channel_qty = (source == XRAUDIO_DEVICE_INPUT_QUAD) ? 4 : (source == XRAUDIO_DEVICE_INPUT_TRI) ? 3 : 1;
+   obj->format_out.sample_size = (source == XRAUDIO_DEVICE_INPUT_QUAD || source == XRAUDIO_DEVICE_INPUT_TRI) ? 4 : XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE;
 
    obj->state = XRAUDIO_INPUT_STATE_STREAMING;
 

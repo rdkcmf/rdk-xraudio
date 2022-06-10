@@ -318,6 +318,7 @@ const char *xraudio_container_str(xraudio_container_t type) {
 const char *xraudio_encoding_str(xraudio_encoding_t type) {
    switch(type) {
       case XRAUDIO_ENCODING_PCM:              return("PCM");
+      case XRAUDIO_ENCODING_PCM_RAW:          return("PCM_RAW");
       case XRAUDIO_ENCODING_MP3:              return("MP3");
       case XRAUDIO_ENCODING_ADPCM_XVP:        return("ADPCM_XVP");
       case XRAUDIO_ENCODING_ADPCM_SKY:        return("ADPCM_SKY");
