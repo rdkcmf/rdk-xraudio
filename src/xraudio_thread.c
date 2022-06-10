@@ -494,7 +494,7 @@ static unsigned char g_frame_silence[2 * XRAUDIO_OUTPUT_FRAME_SIZE_MAX];
 static xraudio_session_voice_t g_voice_session = {0};
 
 void *xraudio_main_thread(void *param) {
-   xraudio_thread_state_t state;
+   xraudio_thread_state_t state = {0};
 #ifdef XRAUDIO_KWD_ENABLED
    json_t *jkwd_config = NULL;
 #endif
@@ -1913,7 +1913,9 @@ void timer_frame_process(void *data) {
    }
 
    if(timeout_val == 0) {
-      rdkx_timer_remove(state->timer_obj, state->timer_id_frame);
+      if(!rdkx_timer_remove(state->timer_obj, state->timer_id_frame)) {
+         XLOGD_ERROR("timer remove");
+      }
       state->timer_id_frame = RDXK_TIMER_ID_INVALID;
    } else {
       // Update the timeout
@@ -4074,10 +4076,10 @@ bool xraudio_hal_msg_async_handler(void *msg) {
       case XRAUDIO_MSG_TYPE_INPUT_ERROR: {
          xraudio_hal_msg_input_error_t *input_error = (xraudio_hal_msg_input_error_t *)msg;
          // Send message to queue
-         xraudio_queue_msg_async_input_error_t msg;
-         msg.header.type = XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR;
-         msg.source      = input_error->header.source;
-         queue_msg_push(g_voice_session.msgq, (char *)&msg, sizeof(msg));
+         xraudio_queue_msg_async_input_error_t error_msg;
+         error_msg.header.type = XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR;
+         error_msg.source      = input_error->header.source;
+         queue_msg_push(g_voice_session.msgq, (char *)&error_msg, sizeof(msg));
          ret = true;
          break;
       }

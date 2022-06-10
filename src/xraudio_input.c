@@ -1220,11 +1220,11 @@ xraudio_result_t xraudio_input_stop_locked(xraudio_input_obj_t *obj, int32_t ind
    }
 
    bool more_streams = false;
-   for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-      if(index >= index_begin && index < index_end && obj->fifo_audio_data[index] >= 0) {
+   for(uint32_t i = 0; i < XRAUDIO_FIFO_QTY_MAX; i++) {
+      if(i >= index_begin && i < index_end && obj->fifo_audio_data[i] >= 0) {
          // xraudio main thread is responsible for closing write side of the pipe
-         obj->fifo_audio_data[index] = -1;
-      } else if(obj->fifo_audio_data[index] >= 0) {
+         obj->fifo_audio_data[i] = -1;
+      } else if(obj->fifo_audio_data[i] >= 0) {
          more_streams = true;
       }
    }
@@ -1237,10 +1237,10 @@ xraudio_result_t xraudio_input_stop_locked(xraudio_input_obj_t *obj, int32_t ind
       obj->stream_keyword_begin    = 0;
       obj->stream_keyword_duration = 0;
 
-      for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-         obj->from[index]   = XRAUDIO_INPUT_RECORD_FROM_INVALID;
-         obj->offset[index] = 0;
-         obj->until[index]  = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+      for(uint32_t i = 0; i < XRAUDIO_FIFO_QTY_MAX; i++) {
+         obj->from[i]   = XRAUDIO_INPUT_RECORD_FROM_INVALID;
+         obj->offset[i] = 0;
+         obj->until[i]  = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
       }
 
       obj->state = XRAUDIO_INPUT_STATE_IDLING;
