@@ -4079,7 +4079,7 @@ bool xraudio_hal_msg_async_handler(void *msg) {
          xraudio_queue_msg_async_input_error_t error_msg;
          error_msg.header.type = XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR;
          error_msg.source      = input_error->header.source;
-         queue_msg_push(g_voice_session.msgq, (char *)&error_msg, sizeof(msg));
+         queue_msg_push(g_voice_session.msgq, (char *)&error_msg, sizeof(error_msg));
          ret = true;
          break;
       }
