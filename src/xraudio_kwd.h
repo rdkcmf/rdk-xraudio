@@ -54,6 +54,10 @@ typedef float xraudio_kwd_score_t;
 /// @details The xraudio KWD SNR type is used to store the signal to noise ratio in DB.
 typedef float xraudio_kwd_snr_t;
 
+/// @brief xraudio KWD sensitivity
+/// @details The xraudio KWD sensitivity type is used to store the sensitivity of the keyword detector
+typedef float xraudio_keyword_sensitivity_t;
+
 /// @}
 
 /// @addtogroup XRAUDIO_KWD_ENUMS
@@ -132,13 +136,13 @@ void                 xraudio_kwd_object_destroy(xraudio_kwd_object_t object);
 /// @param[in] object   Reference to an xraudio KWD object.
 /// @param[in]
 /// @param[in]
-bool                 xraudio_kwd_init(xraudio_kwd_object_t object, uint8_t chan_qty, uint8_t sensitivity, int *spot_delay, xraudio_kwd_criterion_t *criterion);
+bool                 xraudio_kwd_init(xraudio_kwd_object_t object, uint8_t chan_qty, xraudio_keyword_sensitivity_t sensitivity, int *spot_delay, xraudio_kwd_criterion_t *criterion);
 
 /// @brief Update xraudio KWD parameters
 /// @details Update an xraudio KWD object with the provided parameters.  Returns true for success and false for failure.
 /// @param[in] object   Reference to an xraudio KWD object.
 /// @param[in]
-bool                 xraudio_kwd_update(xraudio_kwd_object_t object, uint8_t sensitivity);
+bool                 xraudio_kwd_update(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t sensitivity);
 
 /// @brief Run an xraudio KWD
 /// @details Run the keyword detector with the provided input parameters.  Returns true for success and false for failure.
@@ -165,22 +169,22 @@ bool                 xraudio_kwd_result(xraudio_kwd_object_t object, uint8_t cha
 /// @details Terminates an xraudio KWD session if it has been initialized.
 /// @param[in] object   Reference to an xraudio KWD object.
 void                 xraudio_kwd_term(xraudio_kwd_object_t object);
-bool                 xraudio_kwd_sensitivity_limits_get(xraudio_kwd_object_t object, uint8_t *first, uint8_t *last);
-bool                 xraudio_kwd_sensitivity_lut_check(xraudio_kwd_object_t object, uint8_t *sensitivity_lut, uint8_t sensitivity_lut_size);
+bool                 xraudio_kwd_sensitivity_limits_get(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t *min, xraudio_keyword_sensitivity_t *max);
+bool                 xraudio_kwd_sensitivity_lut_check(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t *sensitivity_lut, uint8_t sensitivity_lut_size);
 
 /// @brief Retrieves an xraudio KWD object's parameters
 /// @details Retrieves an xraudio KWD object's sensitivity limits.
 /// @param[in] object   Reference to an xraudio KWD object.
 /// @param[in]
 /// @param[in]
-bool                 xraudio_kwd_sensitivity_limits_get(xraudio_kwd_object_t object, uint8_t *first, uint8_t *last);
+bool                 xraudio_kwd_sensitivity_limits_get(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t *min, xraudio_keyword_sensitivity_t *max);
 
 /// @brief TBD
 /// @details TBD
 /// @param[in] object   Reference to an xraudio KWD object.
 /// @param[in]
 /// @param[in]
-bool                 xraudio_kwd_sensitivity_lut_check(xraudio_kwd_object_t object, uint8_t *sensitivity_lut, uint8_t sensitivity_lut_size);
+bool                 xraudio_kwd_sensitivity_lut_check(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t *sensitivity_lut, uint8_t sensitivity_lut_size);
 
 /// @}
 

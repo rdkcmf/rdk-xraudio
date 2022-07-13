@@ -248,13 +248,13 @@ typedef struct {
    keyword_callback_t              callback;
    void *                          param;
    uint8_t                         chan_qty;
-   uint8_t                         sensitivity;
+   xraudio_keyword_sensitivity_t   sensitivity;
    sem_t *                         semaphore;
 } xraudio_queue_msg_detect_t;
 
 typedef struct {
    xraudio_main_queue_msg_header_t header;
-   uint8_t                         sensitivity;
+   xraudio_keyword_sensitivity_t   sensitivity;
 } xraudio_queue_msg_detect_params_t;
 
 typedef struct {

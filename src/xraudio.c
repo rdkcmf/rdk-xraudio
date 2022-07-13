@@ -1335,7 +1335,7 @@ void queue_msg_push(xr_mq_t xrmq, const char *msg, xr_mq_msg_size_t msg_size) {
    }
 }
 
-xraudio_result_t xraudio_detect_params(xraudio_object_t object, xraudio_keyword_phrase_t keyword_phrase, xraudio_keyword_config_t keyword_config) {
+xraudio_result_t xraudio_detect_params(xraudio_object_t object, xraudio_keyword_phrase_t keyword_phrase, xraudio_keyword_sensitivity_t keyword_sensitivity) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1354,7 +1354,7 @@ xraudio_result_t xraudio_detect_params(xraudio_object_t object, xraudio_keyword_
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_keyword_params(obj->obj_input, keyword_phrase, keyword_config);
+      result = xraudio_input_keyword_params(obj->obj_input, keyword_phrase, keyword_sensitivity);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);

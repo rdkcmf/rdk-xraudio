@@ -74,7 +74,7 @@ typedef struct {
 } xraudio_input_capture_t;
 
 typedef struct {
-   uint8_t     sensitivity;
+   xraudio_keyword_sensitivity_t sensitivity;
 } xraudio_input_detect_params_t;
 
 typedef struct {
@@ -258,7 +258,7 @@ xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, ui
    obj->capture.container        = XRAUDIO_CONTAINER_INVALID;
    obj->capture.audio_file_path  = NULL;
 
-   obj->detect_params.sensitivity = XRAUDIO_KEYWORD_CONFIG_4;
+   obj->detect_params.sensitivity = XRAUDIO_INPUT_DEFAULT_KEYWORD_SENSITIVITY;
    obj->stream_time_minimum       = 0;
    obj->stream_keyword_begin      = 0;
    obj->stream_keyword_duration   = 0;
@@ -949,13 +949,13 @@ xraudio_result_t xraudio_input_stream_identifer_set(xraudio_object_t object, con
    return(XRAUDIO_RESULT_OK);
 }
 
-xraudio_result_t xraudio_input_keyword_params(xraudio_input_object_t object, xraudio_keyword_phrase_t keyword_phrase, xraudio_keyword_config_t keyword_config) {
+xraudio_result_t xraudio_input_keyword_params(xraudio_input_object_t object, xraudio_keyword_phrase_t keyword_phrase, xraudio_keyword_sensitivity_t keyword_sensitivity) {
    xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
    if(!xraudio_input_object_is_valid(obj)) {
       XLOGD_ERROR("Invalid object.");
       return(XRAUDIO_RESULT_ERROR_OBJECT);
    }
-   if(keyword_phrase >= XRAUDIO_KEYWORD_PHRASE_INVALID || keyword_config >= XRAUDIO_KEYWORD_CONFIG_INVALID) {
+   if(keyword_phrase >= XRAUDIO_KEYWORD_PHRASE_INVALID) {
       XLOGD_ERROR("Invalid parameters.");
       return(XRAUDIO_RESULT_ERROR_PARAMS);
    }
@@ -965,9 +965,9 @@ xraudio_result_t xraudio_input_keyword_params(xraudio_input_object_t object, xra
    switch(keyword_phrase) {
       default:
       case XRAUDIO_KEYWORD_PHRASE_HEY_XFINITY: {
-         XLOGD_INFO("keyword config <%s> detecting <%s>", xraudio_keyword_config_str(keyword_config), (obj->state == XRAUDIO_INPUT_STATE_DETECTING) ? "YES" : "NO");
-         if(obj->detect_params.sensitivity != keyword_config) {
-            obj->detect_params.sensitivity = keyword_config;
+         XLOGD_INFO("keyword sensitivity <%f> detecting <%s>", keyword_sensitivity, (obj->state == XRAUDIO_INPUT_STATE_DETECTING) ? "YES" : "NO");
+         if(obj->detect_params.sensitivity != keyword_sensitivity) {
+            obj->detect_params.sensitivity = keyword_sensitivity;
             if(obj->state == XRAUDIO_INPUT_STATE_DETECTING) {
                xraudio_input_dispatch_detect_params(obj);
             }
