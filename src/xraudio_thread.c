@@ -1157,6 +1157,14 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
 
          // Must use only 1 frame in a group because raw audio is not buffered
          state->record.frame_group_qty = 1;
+
+         #ifdef XRAUDIO_KWD_ENABLED
+         // Dump pre detection samples since all audio needs to come after test mode is enabled
+         state->record.pre_detection_sample_qty = 0;
+      } else if(state->record.format_out.encoding == XRAUDIO_ENCODING_PCM && state->record.format_out.sample_size > 2) {
+         // Dump pre detection samples for 32-bit PCM since they are not available until circular buffer is converted from float to int32_t (no use case for this yet)
+         state->record.pre_detection_sample_qty = 0;
+         #endif
       }
    }
 
@@ -2778,7 +2786,7 @@ int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thre
 
 int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
    int rc = 0;
-   uint8_t chan = 0;
+   uint8_t chan = 1; // TODO default to center channel for now
    int16_t *frame_buffer_int16 = NULL;
    #ifdef XRAUDIO_DGA_ENABLED
    float *  frame_buffer_fp32  = NULL;
@@ -2965,6 +2973,14 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
          if(session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) {
             data_size = session->raw_mic_frame_size;
             data_ptr  = session->raw_mic_frame_ptr;
+         } else if(session->format_out.encoding == XRAUDIO_ENCODING_PCM && session->format_out.sample_size == 4) { // 32-bit PCM
+            if(session->format_out.channel_qty > 1) { // All channels
+               data_size = session->raw_mic_frame_size;
+               data_ptr  = session->raw_mic_frame_ptr;
+            } else { // Single channel
+               data_size = session->frame_size_out;
+               data_ptr  = &session->raw_mic_frame_ptr[data_size * chan];
+            }
          } else {
             data_size = frame_size_int16 * frame_group_index;
             data_ptr  = frame_buffer_int16;
@@ -3024,7 +3040,7 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
             }
          }
 
-         if(session->capture_internal.active && (session->external_format.encoding == (session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) ? XRAUDIO_ENCODING_PCM : session->format_out.encoding)) {
+         if(session->capture_internal.active && (session->external_format.encoding == ((session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) ? XRAUDIO_ENCODING_PCM : session->format_out.encoding))) {
             int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)data_ptr, data_size, &session->capture_internal.native);
             if(rc_cap < 0) {
                xraudio_in_capture_internal_end(&session->capture_internal);

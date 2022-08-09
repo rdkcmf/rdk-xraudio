@@ -789,7 +789,7 @@ xraudio_result_t xraudio_input_stream_to_pipe(xraudio_input_object_t object, xra
    obj->format_out.container   = XRAUDIO_CONTAINER_NONE;
    obj->format_out.encoding    = XRAUDIO_ENCODING_PCM;
    obj->format_out.channel_qty = (source == XRAUDIO_DEVICE_INPUT_QUAD) ? 4 : (source == XRAUDIO_DEVICE_INPUT_TRI) ? 3 : 1;
-   obj->format_out.sample_size = (source == XRAUDIO_DEVICE_INPUT_QUAD || source == XRAUDIO_DEVICE_INPUT_TRI) ? 4 : XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE;
+   obj->format_out.sample_size = (format_decoded != NULL) ? format_decoded->sample_size : XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE;
 
    obj->state = XRAUDIO_INPUT_STATE_STREAMING;
 
