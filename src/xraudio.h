@@ -396,6 +396,9 @@ xraudio_result_t xraudio_detect_keyword(xraudio_object_t object, keyword_callbac
 /// @brief Stop keyword detection
 /// @details Stop the keyword detection session.  The detector stops processing incoming audio data.
 xraudio_result_t xraudio_detect_stop(xraudio_object_t object);
+/// @brief Get the keyword detection sensitivity limits
+/// @details Gets the keyword detection sensitivity limits from the detector.
+xraudio_result_t xraudio_detect_sensitivity_limits_get(xraudio_object_t object, xraudio_keyword_sensitivity_t *keyword_sensitivity_min, xraudio_keyword_sensitivity_t *keyword_sensitivity_max);
 /// @brief Transfer sound intensity data to the specified fifo
 /// @details This function sets a named pipe (fifo) in which to transfer sound intensity measurements when a recording session is in process.
 xraudio_result_t xraudio_record_sound_intensity_transfer(xraudio_object_t object, const char *fifo_name);

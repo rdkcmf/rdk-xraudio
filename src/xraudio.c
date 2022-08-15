@@ -1410,6 +1410,43 @@ xraudio_result_t xraudio_detect_stop(xraudio_object_t object) {
    return(result);
 }
 
+xraudio_result_t xraudio_detect_sensitivity_limits_get(xraudio_object_t object, xraudio_keyword_sensitivity_t *keyword_sensitivity_min, xraudio_keyword_sensitivity_t *keyword_sensitivity_max) {
+   xraudio_obj_t *obj = (xraudio_obj_t *)object;
+   if(!xraudio_object_is_valid(obj)) {
+      XLOGD_ERROR("Invalid object.");
+      return XRAUDIO_RESULT_ERROR_OBJECT;
+   }
+   if(keyword_sensitivity_min == NULL || keyword_sensitivity_max == NULL) {
+      XLOGD_ERROR("Invalid params - keyword_sensitivity_min <%p> keyword_sensitivity_max <%p>", keyword_sensitivity_min, keyword_sensitivity_max);
+      return(XRAUDIO_RESULT_ERROR_PARAMS);
+   }
+
+   xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
+   XRAUDIO_API_MUTEX_LOCK();
+
+   sem_t semaphore;
+   sem_init(&semaphore, 0, 0);
+
+   xraudio_main_queue_msg_detect_sensitivity_limits_get_t msg;
+   msg.header.type = XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_SENSITIVITY_LIMITS_GET;
+   msg.min         = keyword_sensitivity_min;
+   msg.max         = keyword_sensitivity_max;
+   msg.semaphore   = &semaphore;
+   msg.result      = &result;
+
+   queue_msg_push(obj->msgq_main, (const char*)&msg, sizeof(msg));
+
+   sem_wait(&semaphore);
+   sem_destroy(&semaphore);
+
+   if(result != XRAUDIO_RESULT_OK) {
+      XLOGD_ERROR("unable to get keyword detector sensitivity limits");
+   }
+
+   XRAUDIO_API_MUTEX_UNLOCK();
+   return(result);
+}
+
 xraudio_result_t xraudio_record_sound_intensity_transfer(xraudio_object_t object, const char *fifo_name) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;

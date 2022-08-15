@@ -441,6 +441,7 @@ static void xraudio_msg_play_resume(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_play_stop(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_detect_params(xraudio_thread_state_t *state, void *msg);
+static void xraudio_msg_detect_sensitivity_limits_get(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_async_session_end(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_async_input_error(xraudio_thread_state_t *state, void *msg);
@@ -467,6 +468,7 @@ static const xraudio_msg_handler_t g_xraudio_msg_handlers[XRAUDIO_MAIN_QUEUE_MSG
    xraudio_msg_play_stop,
    xraudio_msg_detect,
    xraudio_msg_detect_params,
+   xraudio_msg_detect_sensitivity_limits_get,
    xraudio_msg_async_session_begin,
    xraudio_msg_async_session_end,
    xraudio_msg_async_input_error,
@@ -1702,6 +1704,27 @@ void xraudio_msg_detect_params(xraudio_thread_state_t *state, void *msg) {
    xraudio_keyword_detector_t *detector = &state->record.keyword_detector;
    if(xraudio_keyword_detector_session_is_armed(detector) && (detector->sensitivity != detect_params->sensitivity)) {
       xraudio_keyword_detector_session_arm(detector, detector->callback, detector->cb_param, detect_params->sensitivity);
+   }
+   #endif
+}
+
+void xraudio_msg_detect_sensitivity_limits_get(xraudio_thread_state_t *state, void *msg) {
+   #ifdef XRAUDIO_KWD_ENABLED
+   xraudio_main_queue_msg_detect_sensitivity_limits_get_t *detect_sensitivity_limits_get = (xraudio_main_queue_msg_detect_sensitivity_limits_get_t *)msg;
+   XLOGD_DEBUG("");
+
+   xraudio_result_t result = XRAUDIO_RESULT_OK;
+
+   xraudio_keyword_detector_t *detector = &state->record.keyword_detector;
+   if(!xraudio_kwd_sensitivity_limits_get(detector->kwd_object, detect_sensitivity_limits_get->min, detect_sensitivity_limits_get->max)) {
+      result = XRAUDIO_RESULT_ERROR_INTERNAL;
+   }
+
+   if(detect_sensitivity_limits_get->semaphore != NULL) {
+      if(detect_sensitivity_limits_get->result != NULL) {
+         *(detect_sensitivity_limits_get->result) = result;
+      }
+      sem_post(detect_sensitivity_limits_get->semaphore);
    }
    #endif
 }

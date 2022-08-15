@@ -169,8 +169,6 @@ bool                 xraudio_kwd_result(xraudio_kwd_object_t object, uint8_t cha
 /// @details Terminates an xraudio KWD session if it has been initialized.
 /// @param[in] object   Reference to an xraudio KWD object.
 void                 xraudio_kwd_term(xraudio_kwd_object_t object);
-bool                 xraudio_kwd_sensitivity_limits_get(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t *min, xraudio_keyword_sensitivity_t *max);
-bool                 xraudio_kwd_sensitivity_lut_check(xraudio_kwd_object_t object, xraudio_keyword_sensitivity_t *sensitivity_lut, uint8_t sensitivity_lut_size);
 
 /// @brief Retrieves an xraudio KWD object's parameters
 /// @details Retrieves an xraudio KWD object's sensitivity limits.

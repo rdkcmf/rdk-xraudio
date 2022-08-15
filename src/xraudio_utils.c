@@ -351,28 +351,29 @@ const char *xraudio_resource_id_output_str(xraudio_resource_id_output_t type) {
 
 const char *xraudio_main_queue_msg_type_str(xraudio_main_queue_msg_type_t type) {
    switch(type) {
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_START:   return("RECORD IDLE START");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_STOP:    return("RECORD IDLE STOP");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_START:        return("RECORD START");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_STOP:         return("RECORD STOP");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_START:       return("CAPTURE START");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_STOP:        return("CAPTURE STOP");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_IDLE:           return("PLAY IDLE");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_START:          return("PLAY START");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_PAUSE:          return("PLAY PAUSE");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_RESUME:         return("PLAY RESUME");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_STOP:           return("PLAY STOP");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT:              return("DETECT");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_PARAMS:       return("DETECT_PARAMS");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN: return("SESSION_BEGIN");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END:   return("SESSION_END");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR:   return("INPUT_ERROR");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_TERMINATE:           return("TERMINATE");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL:         return("THREAD_POLL");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE:          return("POWER_MODE");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE:        return("PRIVACY_MODE");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET:    return("PRIVACY_MODE_GET");
-      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID:             return("INVALID");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_START:               return("RECORD IDLE START");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_IDLE_STOP:                return("RECORD IDLE STOP");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_START:                    return("RECORD START");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_RECORD_STOP:                     return("RECORD STOP");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_START:                   return("CAPTURE START");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_CAPTURE_STOP:                    return("CAPTURE STOP");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_IDLE:                       return("PLAY IDLE");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_START:                      return("PLAY START");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_PAUSE:                      return("PLAY PAUSE");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_RESUME:                     return("PLAY RESUME");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PLAY_STOP:                       return("PLAY STOP");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT:                          return("DETECT");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_PARAMS:                   return("DETECT_PARAMS");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_SENSITIVITY_LIMITS_GET:   return("DETECT SENSITIVITY LIMITS");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN:             return("SESSION_BEGIN");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END:               return("SESSION_END");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR:               return("INPUT_ERROR");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_TERMINATE:                       return("TERMINATE");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL:                     return("THREAD_POLL");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE:                      return("POWER_MODE");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE:                    return("PRIVACY_MODE");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET:                return("PRIVACY_MODE_GET");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID:                         return("INVALID");
    }
    return(xraudio_invalid_return(type));
 }
