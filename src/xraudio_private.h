@@ -242,6 +242,7 @@ typedef struct {
    uint32_t                        stream_keyword_begin;
    uint32_t                        stream_keyword_duration;
    char                            identifier[XRAUDIO_STREAM_ID_SIZE_MAX];
+   xraudio_stream_latency_mode_t   latency_mode;
 } xraudio_queue_msg_record_start_t;
 
 typedef struct {

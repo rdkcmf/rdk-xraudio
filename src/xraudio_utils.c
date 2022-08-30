@@ -436,6 +436,15 @@ const char *xraudio_input_record_until_str(xraudio_input_record_until_t type) {
    return(xraudio_invalid_return(type));
 }
 
+const char *xraudio_input_stream_latency_mode_str(xraudio_stream_latency_mode_t type) {
+   switch(type) {
+      case XRAUDIO_STREAM_LATENCY_NORMAL:    return("NORMAL");
+      case XRAUDIO_STREAM_LATENCY_LOW:       return("LOW");
+      case XRAUDIO_STREAM_LATENCY_INVALID:   return("INVALID");
+   }
+   return(xraudio_invalid_return(type));
+}
+
 const char *audio_out_callback_event_str(audio_out_callback_event_t type) {
    switch(type) {
       case AUDIO_OUT_CALLBACK_EVENT_OK:          return("OK");

@@ -129,6 +129,7 @@ typedef struct {
    uint32_t                      stream_keyword_duration;
    xraudio_hal_dsp_config_t      dsp_config;
    char *                        dsp_name;
+   xraudio_stream_latency_mode_t latency_mode;
 } xraudio_input_obj_t;
 
 static bool             xraudio_input_object_is_valid(xraudio_input_obj_t *obj);
@@ -202,6 +203,7 @@ xraudio_input_object_t xraudio_input_object_create(xraudio_hal_obj_t hal_obj, ui
    obj->fifo_sound_intensity     = -1;
    obj->statistics               = (xraudio_input_statistics_t) { .frames_lost = 0 };
    obj->dsp_config               = dsp_config;
+   obj->latency_mode             = XRAUDIO_STREAM_LATENCY_NORMAL;
    if(NULL == json_obj_input) {
       XLOGD_INFO("json_obj_input is null, using defaults");
    } else {
@@ -924,6 +926,18 @@ xraudio_result_t xraudio_input_sound_intensity_transfer(xraudio_input_object_t o
    return(XRAUDIO_RESULT_OK);
 }
 
+xraudio_result_t xraudio_input_latency_mode_set(xraudio_object_t object, xraudio_stream_latency_mode_t latency_mode) {
+   xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
+   if(!xraudio_input_object_is_valid(obj)) {
+      XLOGD_ERROR("Invalid object.");
+      return(XRAUDIO_RESULT_ERROR_OBJECT);
+   }
+   XLOGD_INFO("latency mode <%s>", xraudio_input_stream_latency_mode_str(latency_mode));
+
+   obj->latency_mode = latency_mode;
+   return(XRAUDIO_RESULT_OK);
+}
+
 xraudio_result_t xraudio_input_frame_group_quantity_set(xraudio_object_t object, uint8_t quantity) {
    xraudio_input_obj_t *obj = (xraudio_input_obj_t *)object;
    if(!xraudio_input_object_is_valid(obj)) {
@@ -1356,6 +1370,10 @@ xraudio_result_t xraudio_input_dispatch_record(xraudio_input_obj_t *obj, xraudio
    msg.fh                      = obj->fh;
    msg.audio_buf_samples       = obj->audio_buf_samples;
    msg.audio_buf_sample_qty    = obj->audio_buf_sample_qty;
+   msg.latency_mode            = obj->latency_mode;
+
+   // Reset latency mode flag back to normal. Latency mode will persist until the end of the stream.
+   obj->latency_mode           = XRAUDIO_STREAM_LATENCY_NORMAL;
 
    for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
       msg.fifo_audio_data[index] = obj->fifo_audio_data[index];

@@ -43,6 +43,7 @@ xraudio_hal_input_obj_t xraudio_input_hal_obj_get(xraudio_input_object_t object)
 xraudio_result_t        xraudio_input_open(xraudio_input_object_t object, xraudio_devices_input_t device, xraudio_power_mode_t power_mode, bool privacy_mode, xraudio_resource_id_input_t resource_id, uint16_t capabilities, xraudio_input_format_t format);
 void                    xraudio_input_close(xraudio_input_object_t object);
 xraudio_result_t        xraudio_input_sound_intensity_transfer(xraudio_input_object_t object, const char *fifo_name);
+xraudio_result_t        xraudio_input_latency_mode_set(xraudio_object_t object, xraudio_stream_latency_mode_t latency_mode);
 xraudio_result_t        xraudio_input_frame_group_quantity_set(xraudio_object_t object, uint8_t quantity);
 xraudio_result_t        xraudio_input_stream_identifer_set(xraudio_object_t object, const char *identifer);
 xraudio_eos_event_t     xraudio_input_eos_run(xraudio_input_object_t object, uint8_t chan, float *input_samples, int32_t sample_qty, int16_t *scaled_eos_samples);

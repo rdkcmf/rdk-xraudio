@@ -147,6 +147,15 @@ typedef enum {
    XRAUDIO_ENCODING_INVALID   = 8, ///< Invalid encoding
 } xraudio_encoding_t;
 
+/// @brief Audio stream latency mode Types
+/// @details The audio stream latency enumeration indicates all the latency modes supported by xraudio.
+typedef enum {
+   XRAUDIO_STREAM_LATENCY_NORMAL      = 0, ///< Default stream processing with normal latency
+   XRAUDIO_STREAM_LATENCY_LOW         = 1, ///< Stream processing optimized for low latency
+   XRAUDIO_STREAM_LATENCY_INVALID     = 2, ///< Invalid stream latency type
+} xraudio_stream_latency_mode_t;
+
+
 /// @brief xraudio interval type
 /// @details The interval type used with xraudio for time synchronization.
 typedef struct timeval  xraudio_interval_t;

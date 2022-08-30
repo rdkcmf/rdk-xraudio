@@ -423,6 +423,9 @@ xraudio_result_t xraudio_stream_keyword_info(xraudio_object_t object, uint32_t k
 /// @brief Transfer sound intensity data to the specified fifo
 /// @details This function sets a named pipe (fifo) in which to transfer sound intensity measurements when a streaming session is in process.
 xraudio_result_t xraudio_stream_sound_intensity_transfer(xraudio_object_t object, const char *fifo_name);
+/// @brief Sets the stream latency mode
+/// @details Prior to streaming sets the stream latency mode. Low latency mode allows the client to process the incoming audio with minimal latency. Default is latency mode is normal.
+xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudio_stream_latency_mode_t latency_mode);
 /// @brief Set the frame group quantity
 /// @details When streaming the audio data will be written in frame sized chunks to the destination.  Setting the frame group quantity increases the size of audio data written to the streaming interface
 /// a multiple of the frame size.  This allows the client to process incoming audio data in larger sized chunks.  The default quantity is XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY.
@@ -557,6 +560,8 @@ const char *     xraudio_ppr_event_str(xraudio_ppr_event_t type);
 const char *     xraudio_ppr_command_str(xraudio_ppr_command_t command);
 /// @brief Convert the xraudio_kwd_criterion_t type to a string
 const char *     xraudio_keyword_criterion_str(xraudio_kwd_criterion_t criterion);
+/// @brief Convert the xraudio_stream_latency_mode_t type to a string
+const char *     xraudio_input_stream_latency_mode_str(xraudio_stream_latency_mode_t latency_mode);
 
 /// @brief Generate a wave file header
 /// @details Generate a wave header at the memory location specified by the header parameter using the specified audio_format, num_channels, sample_rate, bits_per_sample and pcm_data_size parameters.

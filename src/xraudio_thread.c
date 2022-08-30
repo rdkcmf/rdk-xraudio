@@ -207,86 +207,87 @@ typedef struct {
 typedef void (*xraudio_handler_unpack_t)(xraudio_session_record_t *session, void *buffer_in, uint8_t chan_qty, xraudio_audio_group_int16_t *frame_buffer_int16, xraudio_audio_group_float_t *frame_buffer_fp32, uint32_t frame_group_index, uint32_t sample_qty_frame);
 
 struct xraudio_session_record_t {
-   bool                         recording;
-   xraudio_devices_input_t      source;
-   xraudio_in_record_t          record_callback;
-   bool                         mode_changed;
-   bool                         synchronous;
-   audio_in_callback_t          callback;
-   void *                       param;
-   sem_t *                      semaphore;
-   uint8_t                      pcm_bit_qty;
-   int                          fd;
-   xraudio_input_format_t       format_in;
-   xraudio_input_format_t       format_out;
-   FILE *                       fh;
-   xraudio_sample_t *           audio_buf_samples;
-   uint32_t                     audio_buf_sample_qty;
-   uint32_t                     audio_buf_index;
-   audio_in_data_callback_t     data_callback;
-   uint32_t                     timeout;
-   xraudio_handler_unpack_t     handler_unpack;
-   xraudio_audio_group_int16_t  frame_buffer_int16[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
-   xraudio_audio_group_float_t  frame_buffer_fp32[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
-   uint8_t                      frame_group_qty;
-   uint8_t                      frame_group_index;
-   uint32_t                     frame_size_in;
-   uint32_t                     frame_size_out;
-   uint32_t                     frame_sample_qty;
-   uint32_t                     group_sample_qty;
-   int                          fifo_audio_data[XRAUDIO_FIFO_QTY_MAX];
-   int                          fifo_sound_intensity;
+   bool                          recording;
+   xraudio_devices_input_t       source;
+   xraudio_in_record_t           record_callback;
+   bool                          mode_changed;
+   bool                          synchronous;
+   audio_in_callback_t           callback;
+   void *                        param;
+   sem_t *                       semaphore;
+   uint8_t                       pcm_bit_qty;
+   int                           fd;
+   xraudio_input_format_t        format_in;
+   xraudio_input_format_t        format_out;
+   FILE *                        fh;
+   xraudio_sample_t *            audio_buf_samples;
+   uint32_t                      audio_buf_sample_qty;
+   uint32_t                      audio_buf_index;
+   audio_in_data_callback_t      data_callback;
+   uint32_t                      timeout;
+   xraudio_handler_unpack_t      handler_unpack;
+   xraudio_audio_group_int16_t   frame_buffer_int16[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
+   xraudio_audio_group_float_t   frame_buffer_fp32[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
+   uint8_t                       frame_group_qty;
+   uint8_t                       frame_group_index;
+   uint32_t                      frame_size_in;
+   uint32_t                      frame_size_out;
+   uint32_t                      frame_sample_qty;
+   uint32_t                      group_sample_qty;
+   xraudio_stream_latency_mode_t latency_mode;
+   int                           fifo_audio_data[XRAUDIO_FIFO_QTY_MAX];
+   int                           fifo_sound_intensity;
    #ifdef XRAUDIO_KWD_ENABLED
-   uint32_t                     pre_detection_sample_qty;
+   uint32_t                      pre_detection_sample_qty;
    #endif
    #ifdef XRAUDIO_DGA_ENABLED
-   xraudio_dga_object_t         obj_dga;
-   bool                         dynamic_gain_enabled;
-   bool                         dynamic_gain_set;
-   uint8_t                      dynamic_gain_pcm_bit_qty;
-   int16_t                      hal_kwd_peak_power_dBFS;
+   xraudio_dga_object_t          obj_dga;
+   bool                          dynamic_gain_enabled;
+   bool                          dynamic_gain_set;
+   uint8_t                       dynamic_gain_pcm_bit_qty;
+   int16_t                       hal_kwd_peak_power_dBFS;
    #endif
-   uint16_t                     stream_time_minimum;
-   xraudio_input_record_from_t  stream_from[XRAUDIO_FIFO_QTY_MAX];
-   xraudio_input_record_until_t stream_until[XRAUDIO_FIFO_QTY_MAX];
-   int32_t                      stream_begin_offset[XRAUDIO_FIFO_QTY_MAX];
-   xraudio_keyword_detector_t   keyword_detector;
-   xraudio_devices_input_t      devices_input;
-   xraudio_eos_event_t          eos_event;
-   bool                         eos_vad_forced;
-   uint32_t                     eos_end_of_wake_word_samples;
-   bool                         use_hal_eos;
-   bool                         eos_hal_cmd_pending;
-   rdkx_timestamp_t             timestamp_next;
-   xraudio_capture_session_t    capture_session;
-   xraudio_capture_internal_t   capture_internal;
+   uint16_t                      stream_time_minimum;
+   xraudio_input_record_from_t   stream_from[XRAUDIO_FIFO_QTY_MAX];
+   xraudio_input_record_until_t  stream_until[XRAUDIO_FIFO_QTY_MAX];
+   int32_t                       stream_begin_offset[XRAUDIO_FIFO_QTY_MAX];
+   xraudio_keyword_detector_t    keyword_detector;
+   xraudio_devices_input_t       devices_input;
+   xraudio_eos_event_t           eos_event;
+   bool                          eos_vad_forced;
+   uint32_t                      eos_end_of_wake_word_samples;
+   bool                          use_hal_eos;
+   bool                          eos_hal_cmd_pending;
+   rdkx_timestamp_t              timestamp_next;
+   xraudio_capture_session_t     capture_session;
+   xraudio_capture_internal_t    capture_internal;
    #ifdef MASK_FIRST_READ_DELAY
-   xraudio_thread_t             first_read_thread;
-   bool                         first_read_pending;
-   bool                         first_read_complete;
+   xraudio_thread_t              first_read_thread;
+   bool                          first_read_pending;
+   bool                          first_read_complete;
    #endif
-   xraudio_audio_stats_t        internal_session_stats;
-   uint32_t                     internal_sample_qty_min;
-   uint32_t                     internal_keyword_end_samples;
-   int                          external_fd;
-   xraudio_hal_input_obj_t      external_obj_hal;
-   uint8_t                      external_frame_group_index;
-   uint32_t                     external_frame_size_in;
-   uint32_t                     external_frame_size_out;
-   unsigned char                external_frame_buffer[(XRAUDIO_INPUT_EXTERNAL_FRAME_SAMPLE_QTY * sizeof(int16_t)) * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY];
-   xraudio_input_format_t       external_format;
-   uint32_t                     external_data_len;
-   uint32_t                     external_data_len_min;
-   uint32_t                     external_frame_bytes_read;
-   uint32_t                     external_keyword_end_samples;
-   uint32_t                     external_keyword_end_bytes;
-   bool                         keyword_flush;
-   int8_t                       input_aop_adjust_shift;
-   float                        input_aop_adjust_dB;
-   bool                         raw_mic_enable;
-   uint32_t                     raw_mic_frame_skip;
-   uint8_t *                    raw_mic_frame_ptr;
-   uint32_t                     raw_mic_frame_size;
+   xraudio_audio_stats_t         internal_session_stats;
+   uint32_t                      internal_sample_qty_min;
+   uint32_t                      internal_keyword_end_samples;
+   int                           external_fd;
+   xraudio_hal_input_obj_t       external_obj_hal;
+   uint8_t                       external_frame_group_index;
+   uint32_t                      external_frame_size_in;
+   uint32_t                      external_frame_size_out;
+   unsigned char                 external_frame_buffer[(XRAUDIO_INPUT_EXTERNAL_FRAME_SAMPLE_QTY * sizeof(int16_t)) * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY];
+   xraudio_input_format_t        external_format;
+   uint32_t                      external_data_len;
+   uint32_t                      external_data_len_min;
+   uint32_t                      external_frame_bytes_read;
+   uint32_t                      external_keyword_end_samples;
+   uint32_t                      external_keyword_end_bytes;
+   bool                          keyword_flush;
+   int8_t                        input_aop_adjust_shift;
+   float                         input_aop_adjust_dB;
+   bool                          raw_mic_enable;
+   uint32_t                      raw_mic_frame_skip;
+   uint8_t *                     raw_mic_frame_ptr;
+   uint32_t                      raw_mic_frame_size;
 };
 
 typedef struct {
@@ -560,6 +561,7 @@ void *xraudio_main_thread(void *param) {
    state.record.frame_size_out         = 0;
    state.record.frame_sample_qty       = 0;
    state.record.group_sample_qty       = 0;
+   state.record.latency_mode           = XRAUDIO_STREAM_LATENCY_NORMAL;
    state.record.fifo_audio_data[0]     = -1;
    state.record.fifo_sound_intensity   = -1;
    #ifdef XRAUDIO_KWD_ENABLED
@@ -888,6 +890,7 @@ void xraudio_msg_record_idle_start(xraudio_thread_state_t *state, void *msg) {
 
    state->record.frame_group_index = 0;
    state->record.frame_group_qty   = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
+   state->record.latency_mode      = XRAUDIO_STREAM_LATENCY_NORMAL;
 
    state->record.stream_time_minimum    = XRAUDIO_STREAM_TIME_MINIMUM_DEFAULT;
    state->record.stream_begin_offset[0] = 0;
@@ -1047,6 +1050,7 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
 
    state->record.frame_group_index = 0;
    state->record.frame_group_qty   = record->frame_group_qty;
+   state->record.latency_mode      = record->latency_mode;
 
    state->record.mode_changed      = true;
 
@@ -1144,6 +1148,12 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
          }
       }
       #endif
+
+      if(state->record.latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL) {
+         if(!xraudio_hal_input_stream_latency_set(state->params.hal_input_obj, state->record.latency_mode)) {
+            XLOGD_ERROR("unable to set hal input latency mode <%s>", xraudio_input_stream_latency_mode_str(state->record.latency_mode));
+         }
+      }
 
       if(state->record.format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) { // Set raw mic mode
          if(xraudio_hal_input_test_mode(state->params.hal_input_obj, true)) {
@@ -1252,6 +1262,14 @@ void xraudio_msg_record_stop(xraudio_thread_state_t *state, void *msg) {
             XLOGD_ERROR("unable to restore hal input to normal test mode");
          }
          state->record.raw_mic_enable = false;
+      }
+      if(state->record.latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL) {
+         if(xraudio_hal_input_stream_latency_set(state->params.hal_input_obj, XRAUDIO_STREAM_LATENCY_NORMAL)) {
+            XLOGD_INFO("hal input restored to normal latency mode");
+         } else {
+            XLOGD_ERROR("unable to restore hal input to normal latency mode");
+         }
+         state->record.latency_mode = XRAUDIO_STREAM_LATENCY_NORMAL;
       }
    }
 

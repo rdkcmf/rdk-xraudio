@@ -1636,6 +1636,31 @@ xraudio_result_t xraudio_stream_sound_intensity_transfer(xraudio_object_t object
    return(result);
 }
 
+xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudio_stream_latency_mode_t latency_mode) {
+   xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
+   xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
+   if(!xraudio_object_is_valid(obj)) {
+      XLOGD_ERROR("Invalid object.");
+      return(XRAUDIO_RESULT_ERROR_OBJECT);
+   }
+
+   XRAUDIO_API_MUTEX_LOCK();
+   if(!obj->opened) {
+      XLOGD_ERROR("xraudio is not open!");
+      result = XRAUDIO_RESULT_ERROR_OPEN;
+   } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(obj->devices_input) == XRAUDIO_DEVICE_INPUT_NONE) {
+      XLOGD_ERROR("microphone not opened!");
+      result = XRAUDIO_RESULT_ERROR_INPUT;
+   } else if(obj->obj_input == NULL) {
+      XLOGD_ERROR("microphone object is NULL!");
+      result = XRAUDIO_RESULT_ERROR_OPEN;
+   } else {
+      result = xraudio_input_latency_mode_set(obj->obj_input, latency_mode);
+   }
+   XRAUDIO_API_MUTEX_UNLOCK();
+   return(result);
+}
+
 xraudio_result_t xraudio_stream_frame_group_quantity_set(xraudio_object_t object, uint8_t quantity) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
