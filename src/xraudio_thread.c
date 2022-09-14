@@ -2786,7 +2786,7 @@ int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thre
 
 int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
    int rc = 0;
-   uint8_t chan = 1; // TODO default to center channel for now
+   uint8_t chan = (source == XRAUDIO_DEVICE_INPUT_TRI) ? 1 : 0; // default to center channel for TRI beam, otherwise use first channel
    int16_t *frame_buffer_int16 = NULL;
    #ifdef XRAUDIO_DGA_ENABLED
    float *  frame_buffer_fp32  = NULL;
