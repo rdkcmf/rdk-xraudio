@@ -126,9 +126,10 @@ typedef enum {
 /// @details The microphone record from enumeration is used in the record and stream api's to indicate from which point to start recording the session.
 typedef enum {
    XRAUDIO_INPUT_RECORD_FROM_BEGINNING     = 0, ///< Record from the beginning of incoming audio data
-   XRAUDIO_INPUT_RECORD_FROM_KEYWORD_BEGIN = 1, ///< Record from the keyword begin point
-   XRAUDIO_INPUT_RECORD_FROM_KEYWORD_END   = 2, ///< Record from the keyword end point
-   XRAUDIO_INPUT_RECORD_FROM_INVALID       = 3, ///< Invalid record until type
+   XRAUDIO_INPUT_RECORD_FROM_LIVE          = 1, ///< Record from the current live point of incoming audio data
+   XRAUDIO_INPUT_RECORD_FROM_KEYWORD_BEGIN = 2, ///< Record from the keyword begin point
+   XRAUDIO_INPUT_RECORD_FROM_KEYWORD_END   = 3, ///< Record from the keyword end point
+   XRAUDIO_INPUT_RECORD_FROM_INVALID       = 4, ///< Invalid record until type
 } xraudio_input_record_from_t;
 
 /// @details The microphone record until enumeration is used in the record and stream api's to indicate when to stop recording the session.
@@ -413,26 +414,26 @@ xraudio_result_t xraudio_record_to_file(xraudio_object_t object, xraudio_devices
 xraudio_result_t xraudio_record_to_memory(xraudio_object_t object, xraudio_devices_input_t source, xraudio_sample_t *buf_samples, uint32_t sample_qty, xraudio_input_record_from_t from, int32_t offset, xraudio_input_record_until_t until, audio_in_callback_t callback, void *param);
 /// @brief Stop an active recording session
 /// @details This function stops the active recording session.
-xraudio_result_t xraudio_record_stop(xraudio_object_t object);
+xraudio_result_t xraudio_record_stop(xraudio_object_t object, xraudio_devices_input_t source);
 /// @brief Indicates the amount of audio data needed to event minimum audio threshold
 /// @details This function sets the amount of milliseconds of audio data will cause a minimum audio threshold event to occur.
-xraudio_result_t xraudio_stream_time_minimum(xraudio_object_t object, uint16_t ms);
+xraudio_result_t xraudio_stream_time_minimum(xraudio_object_t object, xraudio_devices_input_t source, uint16_t ms);
 /// @brief Indicates information about the keyword present in the stream
 /// @details This function sets the keyword information.
-xraudio_result_t xraudio_stream_keyword_info(xraudio_object_t object, uint32_t keyword_begin, uint32_t keyword_duration);
+xraudio_result_t xraudio_stream_keyword_info(xraudio_object_t object, xraudio_devices_input_t source, uint32_t keyword_begin, uint32_t keyword_duration);
 /// @brief Transfer sound intensity data to the specified fifo
 /// @details This function sets a named pipe (fifo) in which to transfer sound intensity measurements when a streaming session is in process.
 xraudio_result_t xraudio_stream_sound_intensity_transfer(xraudio_object_t object, const char *fifo_name);
 /// @brief Sets the stream latency mode
 /// @details Prior to streaming sets the stream latency mode. Low latency mode allows the client to process the incoming audio with minimal latency. Default is latency mode is normal.
-xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudio_stream_latency_mode_t latency_mode);
+xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudio_devices_input_t source, xraudio_stream_latency_mode_t latency_mode);
 /// @brief Set the frame group quantity
 /// @details When streaming the audio data will be written in frame sized chunks to the destination.  Setting the frame group quantity increases the size of audio data written to the streaming interface
 /// a multiple of the frame size.  This allows the client to process incoming audio data in larger sized chunks.  The default quantity is XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY.
-xraudio_result_t xraudio_stream_frame_group_quantity_set(xraudio_object_t object, uint8_t quantity);
+xraudio_result_t xraudio_stream_frame_group_quantity_set(xraudio_object_t object, xraudio_devices_input_t source, uint8_t quantity);
 /// @brief Set the stream identifier string
 /// @details Prior to streaming, the stream identifer string can be set to provide an identifier for the stream.
-xraudio_result_t xraudio_stream_identifier_set(xraudio_object_t object, const char *identifier);
+xraudio_result_t xraudio_stream_identifier_set(xraudio_object_t object, xraudio_devices_input_t source, const char *identifier);
 /// @brief Stream incoming audio data to a fifo
 /// @details Stream the incoming audio stream to the named pipe (fifo).  The recording will continue until the condition in the until parameter is reached or an error occurs.
 /// The operation is performed synchronously if the callback parameter is NULL.  Otherwise the operation is performed asynchronously with recording events delivered via the callback.
@@ -447,7 +448,7 @@ xraudio_result_t xraudio_stream_to_pipe(xraudio_object_t object, xraudio_devices
 xraudio_result_t xraudio_stream_to_user(xraudio_object_t object, xraudio_devices_input_t source, audio_in_data_callback_t data, xraudio_input_record_from_t from, int32_t offset, xraudio_input_record_until_t until, xraudio_input_format_t *format_decoded, audio_in_callback_t callback, void *param);
 /// @brief Stop an active streaming session
 /// @details This function stops the active streaming session.
-xraudio_result_t xraudio_stream_stop(xraudio_object_t object, int32_t index);
+xraudio_result_t xraudio_stream_stop(xraudio_object_t object, xraudio_devices_input_t source, int32_t index);
 
 // Playback APIs - Synchronous if callback is NULL
 /// @brief Transfer sound intensity data to the specified fifo
@@ -561,7 +562,7 @@ const char *     xraudio_ppr_command_str(xraudio_ppr_command_t command);
 /// @brief Convert the xraudio_kwd_criterion_t type to a string
 const char *     xraudio_keyword_criterion_str(xraudio_kwd_criterion_t criterion);
 /// @brief Convert the xraudio_stream_latency_mode_t type to a string
-const char *     xraudio_input_stream_latency_mode_str(xraudio_stream_latency_mode_t latency_mode);
+const char *     xraudio_stream_latency_mode_str(xraudio_stream_latency_mode_t latency_mode);
 
 /// @brief Generate a wave file header
 /// @details Generate a wave header at the memory location specified by the header parameter using the specified audio_format, num_channels, sample_rate, bits_per_sample and pcm_data_size parameters.

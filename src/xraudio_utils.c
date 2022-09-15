@@ -128,7 +128,8 @@ bool xraudio_devices_input_local_is_valid(xraudio_devices_input_t devices) {
       case XRAUDIO_DEVICE_INPUT_SINGLE:
       case XRAUDIO_DEVICE_INPUT_TRI:
       case XRAUDIO_DEVICE_INPUT_QUAD:
-      case XRAUDIO_DEVICE_INPUT_HFP: {
+      case XRAUDIO_DEVICE_INPUT_HFP:
+      case XRAUDIO_DEVICE_INPUT_MIC_TAP: {
          break;
       }
       default: {
@@ -249,6 +250,13 @@ const char *xraudio_devices_input_str(xraudio_devices_input_t type) {
          strlcat(str, "FF", sizeof(str));
       }
    }
+   if(type & XRAUDIO_DEVICE_INPUT_MIC_TAP) {
+      if(str[0] != '\0') {
+         strlcat(str, ", MIC_TAP", sizeof(str));
+      } else {
+         strlcat(str, "MIC_TAP", sizeof(str));
+      }
+   }
 
    if(str[0] != '\0') {
       return(str);
@@ -366,6 +374,7 @@ const char *xraudio_main_queue_msg_type_str(xraudio_main_queue_msg_type_t type) 
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT:                          return("DETECT");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_PARAMS:                   return("DETECT_PARAMS");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_SENSITIVITY_LIMITS_GET:   return("DETECT SENSITIVITY LIMITS");
+      case XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_STOP:                     return("DETECT STOP");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN:             return("SESSION_BEGIN");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END:               return("SESSION_END");
       case XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR:               return("INPUT_ERROR");
@@ -419,6 +428,7 @@ const char *xraudio_input_state_str(xraudio_input_state_t type) {
 const char *xraudio_input_record_from_str(xraudio_input_record_from_t type) {
    switch(type) {
       case XRAUDIO_INPUT_RECORD_FROM_BEGINNING:     return("BEGINNING");
+      case XRAUDIO_INPUT_RECORD_FROM_LIVE:          return("LIVE");
       case XRAUDIO_INPUT_RECORD_FROM_KEYWORD_BEGIN: return("KEYWORD_BEGIN");
       case XRAUDIO_INPUT_RECORD_FROM_KEYWORD_END:   return("KEYWORD_END");
       case XRAUDIO_INPUT_RECORD_FROM_INVALID:       return("INVALID");
@@ -436,7 +446,7 @@ const char *xraudio_input_record_until_str(xraudio_input_record_until_t type) {
    return(xraudio_invalid_return(type));
 }
 
-const char *xraudio_input_stream_latency_mode_str(xraudio_stream_latency_mode_t type) {
+const char *xraudio_stream_latency_mode_str(xraudio_stream_latency_mode_t type) {
    switch(type) {
       case XRAUDIO_STREAM_LATENCY_NORMAL:    return("NORMAL");
       case XRAUDIO_STREAM_LATENCY_LOW:       return("LOW");
@@ -695,4 +705,15 @@ const char *xraudio_keyword_criterion_str(xraudio_kwd_criterion_t criterion) {
       case XRAUDIO_KWD_CRITERION_INVALID:             return("INVALID");
    }
    return(xraudio_invalid_return(criterion));
+}
+
+const char *xraudio_input_session_group_str(xraudio_input_session_group_t group) {
+   switch(group) {
+      case XRAUDIO_INPUT_SESSION_GROUP_DEFAULT: return("DEFAULT");
+      #ifdef MICROPHONE_TAP_ENABLED
+      case XRAUDIO_INPUT_SESSION_GROUP_MIC_TAP: return("MIC_TAP");
+      #endif
+      case XRAUDIO_INPUT_SESSION_GROUP_QTY:     return("INVALID");
+   }
+   return(xraudio_invalid_return(group));
 }

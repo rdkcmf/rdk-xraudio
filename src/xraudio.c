@@ -1404,7 +1404,7 @@ xraudio_result_t xraudio_detect_stop(xraudio_object_t object) {
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_stop(obj->obj_input, -1);
+      result = xraudio_input_detect_stop(obj->obj_input, obj->devices_input);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
@@ -1536,7 +1536,7 @@ xraudio_result_t xraudio_record_to_memory(xraudio_object_t object, xraudio_devic
    return(result);
 }
 
-xraudio_result_t xraudio_record_stop(xraudio_object_t object) {
+xraudio_result_t xraudio_record_stop(xraudio_object_t object, xraudio_devices_input_t source) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1555,13 +1555,13 @@ xraudio_result_t xraudio_record_stop(xraudio_object_t object) {
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_stop(obj->obj_input, -1);
+      result = xraudio_input_stop(obj->obj_input, source, -1);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
 }
 
-xraudio_result_t xraudio_stream_time_minimum(xraudio_object_t object, uint16_t ms) {
+xraudio_result_t xraudio_stream_time_minimum(xraudio_object_t object, xraudio_devices_input_t source, uint16_t ms) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1580,13 +1580,13 @@ xraudio_result_t xraudio_stream_time_minimum(xraudio_object_t object, uint16_t m
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_stream_time_minimum(obj->obj_input, ms);
+      result = xraudio_input_stream_time_minimum(obj->obj_input, source, ms);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
 }
 
-xraudio_result_t xraudio_stream_keyword_info(xraudio_object_t object, uint32_t keyword_begin, uint32_t keyword_duration) {
+xraudio_result_t xraudio_stream_keyword_info(xraudio_object_t object, xraudio_devices_input_t source, uint32_t keyword_begin, uint32_t keyword_duration) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1605,7 +1605,7 @@ xraudio_result_t xraudio_stream_keyword_info(xraudio_object_t object, uint32_t k
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_stream_keyword_info(obj->obj_input, keyword_begin, keyword_duration);
+      result = xraudio_input_stream_keyword_info(obj->obj_input, source, keyword_begin, keyword_duration);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
@@ -1636,7 +1636,7 @@ xraudio_result_t xraudio_stream_sound_intensity_transfer(xraudio_object_t object
    return(result);
 }
 
-xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudio_stream_latency_mode_t latency_mode) {
+xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudio_devices_input_t source, xraudio_stream_latency_mode_t latency_mode) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1655,13 +1655,13 @@ xraudio_result_t xraudio_stream_latency_mode_set(xraudio_object_t object, xraudi
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_latency_mode_set(obj->obj_input, latency_mode);
+      result = xraudio_input_latency_mode_set(obj->obj_input, source, latency_mode);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
 }
 
-xraudio_result_t xraudio_stream_frame_group_quantity_set(xraudio_object_t object, uint8_t quantity) {
+xraudio_result_t xraudio_stream_frame_group_quantity_set(xraudio_object_t object, xraudio_devices_input_t source, uint8_t quantity) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1680,13 +1680,13 @@ xraudio_result_t xraudio_stream_frame_group_quantity_set(xraudio_object_t object
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_frame_group_quantity_set(obj->obj_input, quantity);
+      result = xraudio_input_frame_group_quantity_set(obj->obj_input, source, quantity);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
 }
 
-xraudio_result_t xraudio_stream_identifier_set(xraudio_object_t object, const char *identifier) {
+xraudio_result_t xraudio_stream_identifier_set(xraudio_object_t object, xraudio_devices_input_t source, const char *identifier) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1705,7 +1705,7 @@ xraudio_result_t xraudio_stream_identifier_set(xraudio_object_t object, const ch
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_stream_identifer_set(obj->obj_input, identifier);
+      result = xraudio_input_stream_identifer_set(obj->obj_input, source, identifier);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);
@@ -1807,7 +1807,7 @@ xraudio_result_t xraudio_stream_to_user(xraudio_object_t object, xraudio_devices
    return(result);
 }
 
-xraudio_result_t xraudio_stream_stop(xraudio_object_t object, int32_t index) {
+xraudio_result_t xraudio_stream_stop(xraudio_object_t object, xraudio_devices_input_t source, int32_t index) {
    xraudio_obj_t *  obj    = (xraudio_obj_t *)object;
    xraudio_result_t result = XRAUDIO_RESULT_ERROR_INVALID;
    if(!xraudio_object_is_valid(obj)) {
@@ -1826,7 +1826,7 @@ xraudio_result_t xraudio_stream_stop(xraudio_object_t object, int32_t index) {
       XLOGD_ERROR("microphone object is NULL!");
       result = XRAUDIO_RESULT_ERROR_OPEN;
    } else {
-      result = xraudio_input_stop(obj->obj_input, index);
+      result = xraudio_input_stop(obj->obj_input, source, index);
    }
    XRAUDIO_API_MUTEX_UNLOCK();
    return(result);

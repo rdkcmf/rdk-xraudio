@@ -64,7 +64,7 @@
 #define XRAUDIO_FIFO_NAME_LENGTH_MAX      (64)
 #define XRAUDIO_FIFO_NAME_LENGTH_MIN      (2)
 
-#define XRAUDIO_FIFO_QTY_MAX              (2)
+#define XRAUDIO_FIFO_QTY_MAX              (1)
 
 #define BLOCK_INTERFERER_DURING_VREX       (1)
 
@@ -95,15 +95,16 @@ typedef enum {
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT                          = 11,
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_PARAMS                   = 12,
    XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_SENSITIVITY_LIMITS_GET   = 13,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN             = 14,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END               = 15,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR               = 16,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_TERMINATE                       = 17,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL                     = 18,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE                      = 19,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE                    = 20,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET                = 21,
-   XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID                         = 22,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT_STOP                     = 14,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_BEGIN             = 15,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_SESSION_END               = 16,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_ASYNC_INPUT_ERROR               = 17,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_TERMINATE                       = 18,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_THREAD_POLL                     = 19,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_POWER_MODE                      = 20,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE                    = 21,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_PRIVACY_MODE_GET                = 22,
+   XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID                         = 23,
 } xraudio_main_queue_msg_type_t;
 
 #ifdef XRAUDIO_RESOURCE_MGMT
@@ -269,6 +270,16 @@ typedef struct {
 
 typedef struct {
    xraudio_main_queue_msg_header_t header;
+   xraudio_devices_input_t         source;
+   bool                            synchronous;
+   audio_in_callback_t             callback;
+   void *                          param;
+   sem_t *                         semaphore;
+} xraudio_queue_msg_detect_stop_t;
+
+typedef struct {
+   xraudio_main_queue_msg_header_t header;
+   xraudio_devices_input_t         source;
    bool                            synchronous;
    int32_t                         index;
    audio_in_callback_t             callback;
@@ -386,6 +397,7 @@ bool xraudio_thread_create(xraudio_thread_t *thread, const char *name, void *(*s
 bool xraudio_thread_join(xraudio_thread_t *thread);
 
 const char *xraudio_main_queue_msg_type_str(xraudio_main_queue_msg_type_t type);
+const char *xraudio_input_session_group_str(xraudio_input_session_group_t group);
 
 void queue_msg_push(xr_mq_t xrmq, const char *msg, xr_mq_msg_size_t msg_len);
 

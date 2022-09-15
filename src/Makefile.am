@@ -30,6 +30,10 @@ if XRAUDIO_RESOURCE_MGMT
 libxraudio_la_SOURCES += xraudio_resource.c
 endif
 
+if MICROPHONE_TAP_ENABLED
+libxraudio_la_CFLAGS  = -DMICROPHONE_TAP_ENABLED
+endif
+
 libxraudio_la_LDFLAGS = -Wl,-whole-archive -lxraudio-hal -Wl,-no-whole-archive
 
 noinst_PROGRAMS      = xraudio_main

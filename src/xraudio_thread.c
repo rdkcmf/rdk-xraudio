@@ -106,8 +106,10 @@
 
 struct xraudio_session_record_t;
 typedef struct xraudio_session_record_t xraudio_session_record_t;
+struct xraudio_session_record_inst_t;
+typedef struct xraudio_session_record_inst_t xraudio_session_record_inst_t;
 
-typedef int (*xraudio_in_record_t)(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
+typedef int (*xraudio_in_record_t)(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
 
 #ifdef XRAUDIO_KWD_ENABLED
 typedef struct {
@@ -173,14 +175,17 @@ typedef struct {
 
 typedef struct {
    bool                    enabled;
-   bool                    active;
    char *                  dir_path;
    uint32_t                file_qty_max;
    uint32_t                file_size_max;
    uint32_t                file_index;
+} xraudio_capture_internal_t;
+
+typedef struct {
+   bool                    active;
    xraudio_capture_file_t  native;
    xraudio_capture_file_t  decoded;
-} xraudio_capture_internal_t;
+} xraudio_capture_instance_t;
 
 typedef struct {
    int16_t samples[XRAUDIO_INPUT_FRAME_SAMPLE_QTY];
@@ -206,58 +211,76 @@ typedef struct {
 
 typedef void (*xraudio_handler_unpack_t)(xraudio_session_record_t *session, void *buffer_in, uint8_t chan_qty, xraudio_audio_group_int16_t *frame_buffer_int16, xraudio_audio_group_float_t *frame_buffer_fp32, uint32_t frame_group_index, uint32_t sample_qty_frame);
 
-struct xraudio_session_record_t {
-   bool                          recording;
+struct xraudio_session_record_inst_t {
    xraudio_devices_input_t       source;
-   xraudio_in_record_t           record_callback;
    bool                          mode_changed;
-   bool                          synchronous;
-   audio_in_callback_t           callback;
-   void *                        param;
-   sem_t *                       semaphore;
-   uint8_t                       pcm_bit_qty;
-   int                           fd;
-   xraudio_input_format_t        format_in;
+   xraudio_in_record_t           record_callback;
+   int                           fifo_audio_data[XRAUDIO_FIFO_QTY_MAX];
+   xraudio_input_record_from_t   stream_from[XRAUDIO_FIFO_QTY_MAX];
+   xraudio_input_record_until_t  stream_until[XRAUDIO_FIFO_QTY_MAX];
+   int32_t                       stream_begin_offset[XRAUDIO_FIFO_QTY_MAX];
    xraudio_input_format_t        format_out;
+   uint32_t                      frame_size_out;
+   uint8_t                       frame_group_qty;
+
    FILE *                        fh;
    xraudio_sample_t *            audio_buf_samples;
    uint32_t                      audio_buf_sample_qty;
    uint32_t                      audio_buf_index;
    audio_in_data_callback_t      data_callback;
-   uint32_t                      timeout;
-   xraudio_handler_unpack_t      handler_unpack;
-   xraudio_audio_group_int16_t   frame_buffer_int16[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
-   xraudio_audio_group_float_t   frame_buffer_fp32[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
-   uint8_t                       frame_group_qty;
-   uint8_t                       frame_group_index;
-   uint32_t                      frame_size_in;
-   uint32_t                      frame_size_out;
-   uint32_t                      frame_sample_qty;
-   uint32_t                      group_sample_qty;
-   xraudio_stream_latency_mode_t latency_mode;
-   int                           fifo_audio_data[XRAUDIO_FIFO_QTY_MAX];
+
+   bool                          synchronous;
+   sem_t *                       semaphore;
+   audio_in_callback_t           callback;
+   void *                        param;
    int                           fifo_sound_intensity;
-   #ifdef XRAUDIO_KWD_ENABLED
-   uint32_t                      pre_detection_sample_qty;
-   #endif
+
+   uint32_t                      keyword_end_samples;
+   bool                          keyword_flush;
+
    #ifdef XRAUDIO_DGA_ENABLED
-   xraudio_dga_object_t          obj_dga;
-   bool                          dynamic_gain_enabled;
    bool                          dynamic_gain_set;
    uint8_t                       dynamic_gain_pcm_bit_qty;
    int16_t                       hal_kwd_peak_power_dBFS;
    #endif
-   uint16_t                      stream_time_minimum;
-   xraudio_input_record_from_t   stream_from[XRAUDIO_FIFO_QTY_MAX];
-   xraudio_input_record_until_t  stream_until[XRAUDIO_FIFO_QTY_MAX];
-   int32_t                       stream_begin_offset[XRAUDIO_FIFO_QTY_MAX];
-   xraudio_keyword_detector_t    keyword_detector;
-   xraudio_devices_input_t       devices_input;
+
+   uint32_t                      stream_time_min_value; // samples or bytes depending on source
+   xraudio_stream_latency_mode_t latency_mode;
+   #ifdef XRAUDIO_KWD_ENABLED
+   uint32_t                      pre_detection_sample_qty;
+   #endif
+
+   xraudio_audio_stats_t         stats; // for internal microphone only
    xraudio_eos_event_t           eos_event;
    bool                          eos_vad_forced;
    uint32_t                      eos_end_of_wake_word_samples;
    bool                          use_hal_eos;
    bool                          eos_hal_cmd_pending;
+   bool                          raw_mic_enable;
+   uint32_t                      raw_mic_frame_skip;
+
+   xraudio_capture_instance_t    capture_internal;
+};
+
+struct xraudio_session_record_t {
+   bool                          recording;
+   uint8_t                       pcm_bit_qty;
+   int                           fd;
+   xraudio_input_format_t        format_in;
+   uint32_t                      timeout;
+   xraudio_handler_unpack_t      handler_unpack;
+   xraudio_audio_group_int16_t   frame_buffer_int16[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
+   xraudio_audio_group_float_t   frame_buffer_fp32[XRAUDIO_INPUT_SUPERFRAME_MAX_CHANNEL_QTY];
+   uint8_t                       frame_group_index;
+   uint32_t                      frame_size_in;
+   uint32_t                      frame_sample_qty;
+   xraudio_stream_latency_mode_t latency_mode;
+   #ifdef XRAUDIO_DGA_ENABLED
+   xraudio_dga_object_t          obj_dga;
+   bool                          dynamic_gain_enabled;
+   #endif
+   xraudio_keyword_detector_t    keyword_detector;
+   xraudio_devices_input_t       devices_input;
    rdkx_timestamp_t              timestamp_next;
    xraudio_capture_session_t     capture_session;
    xraudio_capture_internal_t    capture_internal;
@@ -266,28 +289,23 @@ struct xraudio_session_record_t {
    bool                          first_read_pending;
    bool                          first_read_complete;
    #endif
-   xraudio_audio_stats_t         internal_session_stats;
-   uint32_t                      internal_sample_qty_min;
-   uint32_t                      internal_keyword_end_samples;
    int                           external_fd;
    xraudio_hal_input_obj_t       external_obj_hal;
+   uint8_t                       external_frame_group_qty;
    uint8_t                       external_frame_group_index;
    uint32_t                      external_frame_size_in;
    uint32_t                      external_frame_size_out;
-   unsigned char                 external_frame_buffer[(XRAUDIO_INPUT_EXTERNAL_FRAME_SAMPLE_QTY * sizeof(int16_t)) * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY];
+   uint8_t                       external_frame_buffer[(XRAUDIO_INPUT_EXTERNAL_FRAME_SAMPLE_QTY * sizeof(int16_t)) * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY];
    xraudio_input_format_t        external_format;
    uint32_t                      external_data_len;
-   uint32_t                      external_data_len_min;
    uint32_t                      external_frame_bytes_read;
-   uint32_t                      external_keyword_end_samples;
-   uint32_t                      external_keyword_end_bytes;
-   bool                          keyword_flush;
    int8_t                        input_aop_adjust_shift;
    float                         input_aop_adjust_dB;
    bool                          raw_mic_enable;
-   uint32_t                      raw_mic_frame_skip;
-   uint8_t *                     raw_mic_frame_ptr;
-   uint32_t                      raw_mic_frame_size;
+   uint8_t *                     hal_mic_frame_ptr;
+   uint32_t                      hal_mic_frame_size;
+
+   xraudio_session_record_inst_t instances[XRAUDIO_INPUT_SESSION_GROUP_QTY];
 };
 
 typedef struct {
@@ -355,7 +373,7 @@ typedef struct {
    int                     msgq;
    int                     detecting;
    xraudio_devices_input_t sources_supported;
-   xraudio_atomic_int_t    source;
+   xraudio_atomic_int_t    source[XRAUDIO_INPUT_SESSION_GROUP_QTY];
 } xraudio_session_voice_t;
 
 typedef void (*xraudio_msg_handler_t)(xraudio_thread_state_t *state, void *msg);
@@ -364,11 +382,11 @@ static void timer_frame_process(void *data);
 static void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_session_record_t *session, unsigned long *timeout);
 static void xraudio_process_mic_error(xraudio_session_record_t *session);
 static void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_decoders_t *decoders);
-static void xraudio_in_flush(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
-static int  xraudio_in_write_to_file(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
-static int  xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
-static int  xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
-static int  xraudio_in_write_to_user(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
+static void xraudio_in_flush(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
+static int  xraudio_in_write_to_file(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
+static int  xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
+static int  xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
+static int  xraudio_in_write_to_user(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
 
 static void xraudio_unpack_mono_int16(xraudio_session_record_t *session, void *buffer_in, xraudio_audio_group_int16_t *audio_group_int16, xraudio_audio_group_float_t *audio_group_fp32, uint32_t frame_group_index, uint32_t sample_qty_frame);
 static void xraudio_unpack_mono_int32(xraudio_session_record_t *session, void *buffer_in, xraudio_audio_group_int16_t *audio_group_int16, xraudio_audio_group_float_t *audio_group_fp32, uint32_t frame_group_index, uint32_t sample_qty_frame);
@@ -382,7 +400,7 @@ static void     xraudio_keyword_detector_session_init(xraudio_keyword_detector_t
 static bool     xraudio_keyword_detector_session_is_active(xraudio_keyword_detector_t *detector);
 static uint32_t xraudio_keyword_detector_session_pd_avail(xraudio_keyword_detector_t *detector, uint8_t active_chan);
 static void     xraudio_keyword_detector_session_term(xraudio_keyword_detector_t *detector);
-static int      xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
+static int      xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance);
 static void     xraudio_in_write_to_keyword_buffer(xraudio_keyword_detector_chan_t *keyword_detector_chan, float *frame_buffer_fp32, uint32_t sample_qty);
 static bool     xraudio_in_pre_detection_chunks(xraudio_keyword_detector_chan_t *keyword_detector_chan, uint32_t sample_qty, uint32_t offset_from_end, float **chunk_1_data, uint32_t *chunk_1_qty, float **chunk_2_data, uint32_t *chunk_2_qty);
 #endif
@@ -391,7 +409,6 @@ static void xraudio_keyword_detector_session_arm(xraudio_keyword_detector_t *det
 static bool xraudio_keyword_detector_session_is_armed(xraudio_keyword_detector_t *detector);
 static void xraudio_keyword_detector_session_event(xraudio_keyword_detector_t *detector, xraudio_devices_input_t source, keyword_callback_event_t event, xraudio_keyword_detector_result_t *detector_result, xraudio_input_format_t format);
 
-static bool xraudio_in_session_voice_get(xraudio_devices_input_t source);
 static void xraudio_in_sound_intensity_transfer(xraudio_main_thread_params_t *params, xraudio_session_record_t *session);
 
 static void xraudio_process_spkr_data(xraudio_main_thread_params_t *params, xraudio_session_playback_t *session, unsigned long frame_size, unsigned long *timeout, rdkx_timestamp_t *timestamp_sync);
@@ -405,8 +422,8 @@ static int  xraudio_out_write_hal(xraudio_main_thread_params_t *params, xraudio_
 
 static void xraudio_record_container_process_begin(FILE *fh, xraudio_container_t container);
 static void xraudio_record_container_process_end(FILE *fh, xraudio_input_format_t format, unsigned long audio_data_size);
-static void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xraudio_input_format_t *decoded, xraudio_capture_internal_t *capture_internal, const char *stream_id);
-static void xraudio_in_capture_internal_end(xraudio_capture_internal_t *capture_internal);
+static void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xraudio_input_format_t *decoded, xraudio_capture_internal_t *capture_internal, xraudio_capture_instance_t *capture_instance, const char *stream_id);
+static void xraudio_in_capture_internal_end(xraudio_capture_instance_t *capture_instance);
 static int  xraudio_in_capture_internal_to_file(xraudio_session_record_t *session, uint8_t *data_in, uint32_t data_size, xraudio_capture_file_t *capture_file);
 static bool xraudio_in_capture_internal_filename_get(char *filename, const char *dir_path, uint32_t filename_size, xraudio_encoding_t encoding, uint32_t file_index, const char *stream_id);
 
@@ -433,6 +450,11 @@ static int  xraudio_in_capture_session_to_file_int32(xraudio_capture_point_t *ca
 static int  xraudio_in_capture_session_to_file_float(xraudio_capture_point_t *capture_point, float *samples, uint32_t sample_qty);
 #endif
 
+static xraudio_devices_input_t xraudio_in_session_group_source_get(xraudio_input_session_group_t group);
+static bool xraudio_in_session_group_semaphore_lock(xraudio_devices_input_t source);
+static void xraudio_in_session_group_semaphore_unlock(xraudio_thread_state_t *state, xraudio_devices_input_t source);
+static xraudio_session_record_inst_t *xraudio_in_source_to_inst(xraudio_session_record_t *session, xraudio_devices_input_t source);
+
 static void xraudio_msg_record_idle_start(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_record_idle_stop(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg);
@@ -447,6 +469,7 @@ static void xraudio_msg_play_stop(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_detect_params(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_detect_sensitivity_limits_get(xraudio_thread_state_t *state, void *msg);
+static void xraudio_msg_detect_stop(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_async_session_end(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_async_input_error(xraudio_thread_state_t *state, void *msg);
@@ -456,7 +479,7 @@ static void xraudio_msg_power_mode(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_privacy_mode(xraudio_thread_state_t *state, void *msg);
 static void xraudio_msg_privacy_mode_get(xraudio_thread_state_t *state, void *msg);
 
-static void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t frame_duration, uint32_t *frame_size, uint16_t stream_time_minimum, uint32_t *min_audio_data_len);
+static void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t frame_duration, uint32_t *frame_size, uint16_t stream_time_min_ms, uint32_t *min_audio_data_len);
 static bool xraudio_in_aop_adjust_apply(int32_t *buffer, uint32_t sample_qty_frame, int8_t input_aop_adjust_shift);
 
 static const xraudio_msg_handler_t g_xraudio_msg_handlers[XRAUDIO_MAIN_QUEUE_MSG_TYPE_INVALID] = {
@@ -474,6 +497,7 @@ static const xraudio_msg_handler_t g_xraudio_msg_handlers[XRAUDIO_MAIN_QUEUE_MSG
    xraudio_msg_detect,
    xraudio_msg_detect_params,
    xraudio_msg_detect_sensitivity_limits_get,
+   xraudio_msg_detect_stop,
    xraudio_msg_async_session_begin,
    xraudio_msg_async_session_end,
    xraudio_msg_async_input_error,
@@ -531,41 +555,87 @@ void *xraudio_main_thread(void *param) {
                                                     .msgq              = state.params.msgq,
                                                     .detecting         = 0,
                                                     .sources_supported = XRAUDIO_DEVICE_INPUT_NONE,
-                                                    .source            = XRAUDIO_DEVICE_INPUT_INVALID };
+                                                    .source            = { XRAUDIO_DEVICE_INPUT_INVALID } };
    }
 
-   state.record.source               = XRAUDIO_DEVICE_INPUT_NONE;
-   state.record.record_callback      = NULL;
    state.record.recording            = false;
-   state.record.mode_changed         = false;
-   state.record.synchronous          = false;
-   state.record.stream_until[0]      = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
-   state.record.callback             = NULL;
-   state.record.param                = NULL;
-   state.record.semaphore            = NULL;
    state.record.fd                   = -1;
    state.record.format_in            = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
                                                                   .encoding    = XRAUDIO_ENCODING_INVALID,
                                                                   .sample_rate = XRAUDIO_INPUT_DEFAULT_SAMPLE_RATE,
                                                                   .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
                                                                   .channel_qty = XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY };
-   state.record.fh                     = NULL;
-   state.record.audio_buf_samples      = NULL;
-   state.record.audio_buf_sample_qty   = 0;
-   state.record.audio_buf_index        = 0;
-   state.record.data_callback          = NULL;
    state.record.timeout                = 0;
-   state.record.frame_group_qty        = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
    state.record.frame_group_index      = 0;
    state.record.frame_size_in          = 0;
-   state.record.frame_size_out         = 0;
    state.record.frame_sample_qty       = 0;
-   state.record.group_sample_qty       = 0;
    state.record.latency_mode           = XRAUDIO_STREAM_LATENCY_NORMAL;
-   state.record.fifo_audio_data[0]     = -1;
-   state.record.fifo_sound_intensity   = -1;
+
+   for(uint32_t group = XRAUDIO_INPUT_SESSION_GROUP_DEFAULT; group < XRAUDIO_INPUT_SESSION_GROUP_QTY; group++) {
+      xraudio_session_record_inst_t *instance = &state.record.instances[group];
+
+      instance->source                 = XRAUDIO_DEVICE_INPUT_NONE;
+      instance->frame_size_out         = 0;
+      instance->frame_group_qty        = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
+      instance->mode_changed           = false;
+      instance->record_callback        = NULL;
+      instance->fh                     = NULL;
+      instance->audio_buf_samples      = NULL;
+      instance->audio_buf_sample_qty   = 0;
+      instance->audio_buf_index        = 0;
+      instance->data_callback          = NULL;
+      instance->callback               = NULL;
+      instance->param                  = NULL;
+      instance->fifo_sound_intensity   = -1;
+      instance->synchronous            = false;
+      instance->semaphore              = NULL;
+      instance->latency_mode           = XRAUDIO_STREAM_LATENCY_NORMAL;
+
+      for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
+         instance->fifo_audio_data[index]     = -1;
+         instance->stream_from[index]         = XRAUDIO_INPUT_RECORD_FROM_INVALID;
+         instance->stream_until[index]        = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+         instance->stream_begin_offset[index] = 0;
+      }
+
+      #ifdef XRAUDIO_DGA_ENABLED
+      instance->dynamic_gain_set         = false;
+      instance->dynamic_gain_pcm_bit_qty = 0;
+      instance->hal_kwd_peak_power_dBFS  = -96;
+      #endif
+      #ifdef XRAUDIO_KWD_ENABLED
+      instance->pre_detection_sample_qty = 0;
+      #endif
+
+      memset(&instance->stats, 0, sizeof(instance->stats));
+
+      instance->eos_event                    = XRAUDIO_EOS_EVENT_NONE;
+      instance->eos_vad_forced               = false;
+      instance->eos_end_of_wake_word_samples = 0;
+      instance->use_hal_eos                  = false;
+      instance->eos_hal_cmd_pending          = false;
+      instance->raw_mic_enable               = false;
+      instance->raw_mic_frame_skip           = 0;
+
+      instance->capture_internal.active                  = false;
+      instance->capture_internal.native.fh               = NULL;
+      instance->capture_internal.native.audio_data_size  = 0;
+      instance->capture_internal.native.format           = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
+                                                                                      .encoding    = XRAUDIO_ENCODING_INVALID,
+                                                                                      .sample_rate = XRAUDIO_INPUT_DEFAULT_SAMPLE_RATE,
+                                                                                      .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
+                                                                                      .channel_qty = XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY };
+      instance->capture_internal.decoded.fh              = NULL;
+      instance->capture_internal.decoded.audio_data_size = 0;
+      instance->capture_internal.decoded.format          = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
+                                                                                      .encoding    = XRAUDIO_ENCODING_INVALID,
+                                                                                      .sample_rate = XRAUDIO_INPUT_DEFAULT_SAMPLE_RATE,
+                                                                                      .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
+                                                                                      .channel_qty = XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY };
+
+   }
+
    #ifdef XRAUDIO_KWD_ENABLED
-   state.record.pre_detection_sample_qty = 0;
    if(NULL == state.params.json_obj_input) {
       XLOGD_INFO("parameter json_obj_input is null, using defaults");
    } else {
@@ -599,17 +669,9 @@ void *xraudio_main_thread(void *param) {
    }
    state.record.obj_dga                  = xraudio_dga_object_create(jdga_config);
    state.record.dynamic_gain_enabled     = true;
-   state.record.dynamic_gain_set         = false;
-   state.record.dynamic_gain_pcm_bit_qty = 0;
-   state.record.hal_kwd_peak_power_dBFS  = -96;
    #endif
 
    state.record.devices_input                = XRAUDIO_DEVICE_INPUT_NONE;
-   state.record.eos_event                    = XRAUDIO_EOS_EVENT_NONE;
-   state.record.eos_vad_forced               = false;
-   state.record.eos_end_of_wake_word_samples = 0;
-   state.record.use_hal_eos                  = false;
-   state.record.eos_hal_cmd_pending          = false;
    state.record.timestamp_next               = (rdkx_timestamp_t) { .tv_sec = 0, .tv_nsec = 0 };
    memset(state.record.frame_buffer_int16, 0, sizeof(state.record.frame_buffer_int16));
    memset(state.record.frame_buffer_fp32, 0, sizeof(state.record.frame_buffer_fp32));
@@ -632,21 +694,6 @@ void *xraudio_main_thread(void *param) {
       state.record.capture_internal.file_index              = 0;
 
    }
-   state.record.capture_internal.active                  = false;
-   state.record.capture_internal.native.fh               = NULL;
-   state.record.capture_internal.native.audio_data_size  = 0;
-   state.record.capture_internal.native.format           = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
-                                                                                      .encoding    = XRAUDIO_ENCODING_INVALID,
-                                                                                      .sample_rate = XRAUDIO_INPUT_DEFAULT_SAMPLE_RATE,
-                                                                                      .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
-                                                                                      .channel_qty = XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY };
-   state.record.capture_internal.decoded.fh              = NULL;
-   state.record.capture_internal.decoded.audio_data_size = 0;
-   state.record.capture_internal.decoded.format          = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
-                                                                                      .encoding    = XRAUDIO_ENCODING_INVALID,
-                                                                                      .sample_rate = XRAUDIO_INPUT_DEFAULT_SAMPLE_RATE,
-                                                                                      .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
-                                                                                      .channel_qty = XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY };
 
    #ifdef MASK_FIRST_READ_DELAY
    state.record.first_read_thread.id      = 0;
@@ -655,9 +702,9 @@ void *xraudio_main_thread(void *param) {
    state.record.first_read_complete       = false;
    #endif
 
-   memset(&state.record.internal_session_stats, 0, sizeof(state.record.internal_session_stats));
    state.record.external_fd                = -1;
    state.record.external_obj_hal           = NULL;
+   state.record.external_frame_group_qty   = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
    state.record.external_frame_group_index = 0;
    state.record.external_frame_size_in     = 0;
    state.record.external_frame_size_out    = 0;
@@ -698,7 +745,6 @@ void *xraudio_main_thread(void *param) {
    XLOGD_INFO("input AOP adjusted by <%f> dB (shifted right <%d> bits)", state.record.input_aop_adjust_dB, state.record.input_aop_adjust_shift);
 
    state.record.raw_mic_enable     = false;
-   state.record.raw_mic_frame_skip = 0;
 
    memset(g_frame_silence, 0, sizeof(g_frame_silence));
 
@@ -737,7 +783,9 @@ void *xraudio_main_thread(void *param) {
          }
          FD_SET(state.record.fd, &rfds);
       }
-      if(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(state.record.source) != XRAUDIO_DEVICE_INPUT_NONE && XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(state.record.source) == xraudio_atomic_int_get(&g_voice_session.source) && state.record.external_fd >= 0) {
+      xraudio_session_record_inst_t *instance = &state.record.instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+      xraudio_devices_input_t ext_source = XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(instance->source);
+      if(ext_source != XRAUDIO_DEVICE_INPUT_NONE && state.record.external_fd >= 0 && ext_source == xraudio_in_session_group_source_get(XRAUDIO_INPUT_SESSION_GROUP_DEFAULT)) {
          if(state.record.external_fd > state.params.msgq) {
             nfds = state.record.external_fd + 1;
          }
@@ -854,59 +902,65 @@ void *xraudio_main_thread(void *param) {
 void xraudio_msg_record_idle_start(xraudio_thread_state_t *state, void *msg) {
    xraudio_queue_msg_idle_start_t *idle_start = (xraudio_queue_msg_idle_start_t *)msg;
    XLOGD_DEBUG("");
-   state->record.source                    = XRAUDIO_DEVICE_INPUT_NONE;
-   state->record.record_callback           = NULL;
-   state->record.synchronous               = false;
-   state->record.stream_from[0]            = XRAUDIO_INPUT_RECORD_FROM_INVALID;
-   state->record.stream_until[0]           = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
-   state->record.callback                  = NULL;
-   state->record.param                     = NULL;
-   state->record.semaphore                 = NULL;
-   state->record.fh                        = NULL;
-   state->record.audio_buf_samples         = NULL;
-   state->record.audio_buf_sample_qty      = 0;
-   state->record.data_callback             = NULL;
-   state->record.fifo_audio_data[0]        = -1;
-   state->record.fifo_sound_intensity      = -1;
-   state->record.eos_event                 = XRAUDIO_EOS_EVENT_NONE;
-   state->record.eos_vad_forced            = false;
-   state->record.eos_end_of_wake_word_samples = 0;
+
+   xraudio_session_record_inst_t *instance = &state->record.instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+
+   instance->source                        = XRAUDIO_DEVICE_INPUT_NONE;
+   instance->frame_group_qty               = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
+   instance->frame_size_out                = 0;
+   instance->fh                            = NULL;
+   instance->audio_buf_samples             = NULL;
+   instance->audio_buf_sample_qty          = 0;
+   instance->data_callback                 = NULL;
+   instance->callback                      = NULL;
+   instance->param                         = NULL;
+   instance->fifo_sound_intensity          = -1;
+   instance->synchronous                   = false;
+   instance->semaphore                     = NULL;
+   #ifdef XRAUDIO_DGA_ENABLED
+   instance->dynamic_gain_set              = false;
+   #endif
+   instance->eos_event                     = XRAUDIO_EOS_EVENT_NONE;
+   instance->eos_vad_forced                = false;
+   instance->eos_end_of_wake_word_samples  = 0;
+   instance->use_hal_eos                   = (idle_start->capabilities & XRAUDIO_CAPS_INPUT_EOS_DETECTION) ? true : false;
+   instance->eos_hal_cmd_pending           = false;
+
+   for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
+      instance->fifo_audio_data[index]     = -1;
+      instance->stream_from[index]         = XRAUDIO_INPUT_RECORD_FROM_INVALID;
+      instance->stream_until[index]        = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+      instance->stream_begin_offset[index] = 0;
+   }
 
    state->record.fd                        = idle_start->fd;
    state->record.format_in                 = idle_start->format;
    state->record.pcm_bit_qty               = idle_start->pcm_bit_qty;
    state->record.devices_input             = idle_start->devices_input;
-   state->record.use_hal_eos               = (idle_start->capabilities & XRAUDIO_CAPS_INPUT_EOS_DETECTION) ? true : false;
-   state->record.eos_hal_cmd_pending       = false;
    //XLOGD_INFO("record device = %s", xraudio_devices_input_str(state->record.devices_input));
 
    // Set timeout for next chunk (in microseconds)
    state->record.timeout           = XRAUDIO_INPUT_FRAME_PERIOD * 1000;
    state->record.frame_sample_qty  = (XRAUDIO_INPUT_FRAME_PERIOD * state->record.format_in.sample_rate * state->record.format_in.channel_qty) / 1000;
-   state->record.group_sample_qty  = state->record.frame_sample_qty * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY;
-
    state->record.frame_size_in     = state->record.frame_sample_qty * state->record.format_in.sample_size;
-   state->record.frame_size_out    = 0;
-
    state->record.frame_group_index = 0;
-   state->record.frame_group_qty   = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
    state->record.latency_mode      = XRAUDIO_STREAM_LATENCY_NORMAL;
 
-   state->record.stream_time_minimum    = XRAUDIO_STREAM_TIME_MINIMUM_DEFAULT;
-   state->record.stream_begin_offset[0] = 0;
-
+   state->record.external_frame_group_qty   = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
    state->record.external_frame_group_index = 0;
    state->record.external_frame_size_in     = 0;
    state->record.external_frame_size_out    = 0;
-   #ifdef XRAUDIO_DGA_ENABLED
-   state->record.dynamic_gain_set           = false;
-   #endif
+
+   instance->record_callback = NULL;
+
+   xraudio_in_session_group_semaphore_unlock(state, instance->source);
 
    if(state->record.recording) { // Only changing back to idle so don't read the microphone data until it's time
       return;
    }
 
-   state->record.audio_buf_index = 0;
+   instance->audio_buf_index = 0;
+
    // TODO may need to add these back
    //xraudio_input_timing_data_clear(state->params.obj_input);
    //xraudio_input_statistics_clear(state->params.obj_input);
@@ -964,26 +1018,31 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
 
    XLOGD_DEBUG("<%s> intensity <%s>", record->semaphore ? "SYNC" : "ASYNC", record->fifo_sound_intensity >= 0 ? "YES" : "NO");
 
-   state->record.source                    = record->source;
-   state->record.synchronous               = (record->callback == NULL) ? true : false;
-   state->record.callback                  = record->callback;
-   state->record.param                     = record->param;
-   state->record.semaphore                 = record->semaphore;
-   state->record.fh                        = record->fh;
-   state->record.audio_buf_samples         = record->audio_buf_samples;
-   state->record.audio_buf_sample_qty      = record->audio_buf_sample_qty;
-   state->record.data_callback             = record->data_callback;
+   xraudio_session_record_inst_t *instance = xraudio_in_source_to_inst(&state->record, record->source);
+
+   instance->frame_group_qty               = record->frame_group_qty;
+   instance->synchronous                   = (record->callback == NULL) ? true : false;
+   instance->callback                      = record->callback;
+   instance->param                         = record->param;
+   instance->semaphore                     = record->semaphore;
+
+   instance->source                        = record->source;
+   instance->fh                            = record->fh;
+   instance->audio_buf_samples             = record->audio_buf_samples;
+   instance->audio_buf_sample_qty          = record->audio_buf_sample_qty;
+   instance->data_callback                 = record->data_callback;
 
    for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-      state->record.fifo_audio_data[index]     = record->fifo_audio_data[index];
-      state->record.stream_from[index]         = record->stream_from[index];
-      state->record.stream_until[index]        = record->stream_until[index];
-      state->record.stream_begin_offset[index] = record->stream_begin_offset[index];
-
+      instance->fifo_audio_data[index]     = record->fifo_audio_data[index];
+      instance->stream_from[index]         = record->stream_from[index];
+      instance->stream_until[index]        = record->stream_until[index];
+      instance->stream_begin_offset[index] = record->stream_begin_offset[index];
    }
 
-   state->record.fifo_sound_intensity      = record->fifo_sound_intensity;
-   state->record.eos_event                 = XRAUDIO_EOS_EVENT_NONE;
+   instance->fifo_sound_intensity          = record->fifo_sound_intensity;
+   instance->eos_event                     = XRAUDIO_EOS_EVENT_NONE;
+
+   bool external_src = (XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(instance->source) != XRAUDIO_DEVICE_INPUT_NONE) ? true : false;
 
    #ifdef XRAUDIO_KWD_ENABLED
    uint8_t  active_chan                 = state->record.keyword_detector.active_chan;
@@ -997,19 +1056,27 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
 
    switch(stream_from) {
       case XRAUDIO_INPUT_RECORD_FROM_BEGINNING: {
-         state->record.pre_detection_sample_qty = pre_detection_samples_avail - offset;
+         if(external_src) {
+            instance->pre_detection_sample_qty = 0;
+         } else {
+            instance->pre_detection_sample_qty = pre_detection_samples_avail - offset;
+         }
+         break;
+      }
+      case XRAUDIO_INPUT_RECORD_FROM_LIVE: {
+         instance->pre_detection_sample_qty = 0;
          break;
       }
       case XRAUDIO_INPUT_RECORD_FROM_KEYWORD_BEGIN: {
          // this is the start of streaming where the pre-detection sample qty is calculated
          // this is the qty of data that is read from circular buffer and the rest is streamed directly as it comes in
 
-         state->record.pre_detection_sample_qty = - kwd_begin - offset;
-         XLOGD_DEBUG("pre_detection_sample_qty <%u>\n", state->record.pre_detection_sample_qty);
+         instance->pre_detection_sample_qty = - kwd_begin - offset;
+         XLOGD_DEBUG("pre_detection_sample_qty <%u>\n", instance->pre_detection_sample_qty);
          break;
       }
       case XRAUDIO_INPUT_RECORD_FROM_KEYWORD_END: {
-         state->record.pre_detection_sample_qty = 0 - offset;
+         instance->pre_detection_sample_qty = 0 - offset;
 
          if(!state->record.keyword_detector.triggered) { // session was initiated without keyword detected
             state->record.keyword_detector.post_frame_count_callback = 0;
@@ -1021,53 +1088,52 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
          break;
       }
    }
-   if(state->record.keyword_detector.post_frame_count_callback) { // Compensate for audio frames that arrive between keyword detect callback and record start request
+   if(!external_src && stream_from != XRAUDIO_INPUT_RECORD_FROM_LIVE && state->record.keyword_detector.post_frame_count_callback) { // Compensate for audio frames that arrive between keyword detect callback and record start request
       uint32_t chan_sample_qty = state->record.frame_sample_qty / state->record.format_in.channel_qty;
 
-      state->record.pre_detection_sample_qty += state->record.keyword_detector.post_frame_count_callback * chan_sample_qty;
+      instance->pre_detection_sample_qty += state->record.keyword_detector.post_frame_count_callback * chan_sample_qty;
       XLOGD_DEBUG("stream request compensate frames <%u> samples <%u>", state->record.keyword_detector.post_frame_count_callback, state->record.keyword_detector.post_frame_count_callback * chan_sample_qty);
    }
-   if(state->record.pre_detection_sample_qty > pre_detection_samples_avail) {
-      XLOGD_WARN("request out of range <%u> max <%u>", state->record.pre_detection_sample_qty, pre_detection_samples_avail);
-      state->record.pre_detection_sample_qty = pre_detection_samples_avail;
+   if(instance->pre_detection_sample_qty > pre_detection_samples_avail) {
+      XLOGD_WARN("request out of range <%u> max <%u>", instance->pre_detection_sample_qty, pre_detection_samples_avail);
+      instance->pre_detection_sample_qty = pre_detection_samples_avail;
    }
    #endif
 
-   xraudio_keyword_detector_session_disarm(&state->record.keyword_detector);
+   if(record->source != XRAUDIO_DEVICE_INPUT_MIC_TAP) {
+      xraudio_keyword_detector_session_disarm(&state->record.keyword_detector);
+   }
 
    state->record.format_in         = record->format_native;
-   if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(state->record.source) == XRAUDIO_DEVICE_INPUT_SINGLE) {
-      state->record.format_out     = record->format_native;
+   if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(instance->source) == XRAUDIO_DEVICE_INPUT_SINGLE) {
+      instance->format_out     = record->format_native;
    } else {
-      state->record.format_out     = record->format_decoded;
+      instance->format_out     = record->format_decoded;
    }
 
    // Set timeout for next chunk (in microseconds)
    state->record.timeout           = XRAUDIO_INPUT_FRAME_PERIOD * 1000;
-   state->record.frame_size_out    = (XRAUDIO_INPUT_FRAME_PERIOD * state->record.format_out.sample_rate * state->record.format_out.channel_qty * state->record.format_out.sample_size) / 1000;
+   instance->frame_size_out    = (XRAUDIO_INPUT_FRAME_PERIOD * instance->format_out.sample_rate * instance->format_out.channel_qty * instance->format_out.sample_size) / 1000;
    state->record.frame_sample_qty  = (XRAUDIO_INPUT_FRAME_PERIOD * state->record.format_in.sample_rate * state->record.format_in.channel_qty) / 1000;
-   state->record.group_sample_qty  = state->record.frame_sample_qty * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY;
-
    state->record.frame_group_index = 0;
-   state->record.frame_group_qty   = record->frame_group_qty;
-   state->record.latency_mode      = record->latency_mode;
 
-   state->record.mode_changed      = true;
-
+   instance->latency_mode          = record->latency_mode;
+   instance->mode_changed          = true;
+   instance->keyword_flush         = false;
+   instance->raw_mic_frame_skip    = 0;
    
-   state->record.stream_time_minimum = record->stream_time_minimum;
-   state->record.external_data_len          = 0;
-   state->record.external_frame_bytes_read  = 0;
-   state->record.external_frame_group_index = 0;
-   state->record.keyword_flush              = false;
-   state->record.raw_mic_frame_skip         = 0;
+   if(external_src) {
+      state->record.external_frame_group_qty   = record->frame_group_qty;
+      state->record.external_data_len          = 0;
+      state->record.external_frame_bytes_read  = 0;
+      state->record.external_frame_group_index = 0;
+   }
 
    bool decoding = false;
-   bool external = false;
 
-   if(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(state->record.source) != XRAUDIO_DEVICE_INPUT_NONE) {
+   if(external_src) {
       xraudio_encoding_t encoding_in  = state->record.external_format.encoding;
-      xraudio_encoding_t encoding_out = state->record.format_out.encoding;
+      xraudio_encoding_t encoding_out = instance->format_out.encoding;
       uint32_t frame_duration;
       if (encoding_in == XRAUDIO_ENCODING_ADPCM_XVP) {
          frame_duration = 1000 * 1000 * XRAUDIO_INPUT_ADPCM_XVP_FRAME_SAMPLE_QTY / state->record.external_format.sample_rate;
@@ -1076,40 +1142,39 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
       } else {
          frame_duration = 20000;
       }
-      external = true;
       if(encoding_in == encoding_out) {
-         xraudio_encoding_parameters_get(&state->record.external_format, frame_duration, &state->record.external_frame_size_in, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&state->record.external_format, frame_duration, &state->record.external_frame_size_in, record->stream_time_minimum, &instance->stream_time_min_value);
          state->record.external_frame_size_out = state->record.external_frame_size_in;
          XLOGD_INFO("native format <%s> frame size <%u>", xraudio_encoding_str(encoding_in), state->record.external_frame_size_in);
       } else if(encoding_in == XRAUDIO_ENCODING_ADPCM_SKY && encoding_out == XRAUDIO_ENCODING_PCM) {
          state->record.external_frame_size_in = XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE;
-         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&instance->format_out, frame_duration, &state->record.external_frame_size_out, record->stream_time_minimum, &instance->stream_time_min_value);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
       } else if(encoding_in == XRAUDIO_ENCODING_ADPCM_XVP && encoding_out == XRAUDIO_ENCODING_PCM) {
          state->record.external_frame_size_in = XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE;
-         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&instance->format_out, frame_duration, &state->record.external_frame_size_out, record->stream_time_minimum, &instance->stream_time_min_value);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
       } else if(encoding_in == XRAUDIO_ENCODING_ADPCM_XVP && encoding_out == XRAUDIO_ENCODING_ADPCM) {
          state->record.external_frame_size_in = XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE;
-         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&instance->format_out, frame_duration, &state->record.external_frame_size_out, record->stream_time_minimum, &instance->stream_time_min_value);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
       } else if(encoding_in == XRAUDIO_ENCODING_OPUS_XVP && encoding_out == XRAUDIO_ENCODING_PCM) {
-         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&instance->format_out, frame_duration, &state->record.external_frame_size_out, record->stream_time_minimum, &instance->stream_time_min_value);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
       } else if(encoding_in == XRAUDIO_ENCODING_OPUS_XVP && encoding_out == XRAUDIO_ENCODING_OPUS) {
-         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&instance->format_out, frame_duration, &state->record.external_frame_size_out, record->stream_time_minimum, &instance->stream_time_min_value);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
       } else if(encoding_in == XRAUDIO_ENCODING_OPUS && encoding_out == XRAUDIO_ENCODING_PCM) {
-         xraudio_encoding_parameters_get(&state->record.format_out, frame_duration, &state->record.external_frame_size_out, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&instance->format_out, frame_duration, &state->record.external_frame_size_out, record->stream_time_minimum, &instance->stream_time_min_value);
          XLOGD_INFO("decoding <%s> to <%s> frame size in <%u> out <%u>", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), state->record.external_frame_size_in, state->record.external_frame_size_out);
          decoding = true;
       } else {
-         xraudio_encoding_parameters_get(&state->record.external_format, frame_duration, &state->record.external_frame_size_in, state->record.stream_time_minimum, &state->record.external_data_len_min);
+         xraudio_encoding_parameters_get(&state->record.external_format, frame_duration, &state->record.external_frame_size_in, record->stream_time_minimum, &instance->stream_time_min_value);
          state->record.external_frame_size_out = state->record.external_frame_size_in;
          XLOGD_ERROR("xraudio does not support this conversion <%s> to <%s>. output is native format <%s> frame size <%u>.", xraudio_encoding_str(encoding_in), xraudio_encoding_str(encoding_out), xraudio_encoding_str(encoding_in), state->record.external_frame_size_in);
       }
@@ -1117,45 +1182,44 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
       if(record->stream_keyword_duration != 0) { // Keyword is present in the stream
          if(encoding_out != XRAUDIO_ENCODING_PCM) {
             XLOGD_ERROR("xraudio doesn't handle keyword endpoint for encoded output formats.");
-            state->record.external_keyword_end_samples = 0;
-            state->record.external_keyword_end_bytes   = 0;
+            instance->keyword_end_samples = 0;
          } else {
-            state->record.external_keyword_end_samples = record->stream_keyword_begin + record->stream_keyword_duration;
-            state->record.external_keyword_end_bytes   = state->record.external_keyword_end_samples * 2; // 16-bit pcm
+            instance->keyword_end_samples = record->stream_keyword_begin + record->stream_keyword_duration;
          }
       } else {
-         state->record.external_keyword_end_samples = 0;
-         state->record.external_keyword_end_bytes   = 0;
+         instance->keyword_end_samples = 0;
       }
    } else {
       // Reset local mic stats
-      state->record.internal_session_stats.packets_processed    = 0;
-      state->record.internal_session_stats.packets_lost         = 0;
-      state->record.internal_session_stats.samples_processed    = 0;
-      state->record.internal_session_stats.samples_lost         = 0;
-      state->record.internal_session_stats.decoder_failures     = 0;
-      state->record.internal_session_stats.samples_buffered_max = 0;
+      instance->stats.packets_processed    = 0;
+      instance->stats.packets_lost         = 0;
+      instance->stats.samples_processed    = 0;
+      instance->stats.samples_lost         = 0;
+      instance->stats.decoder_failures     = 0;
+      instance->stats.samples_buffered_max = 0;
 
-      state->record.internal_sample_qty_min      = record->stream_time_minimum * state->record.format_in.sample_rate / 1000;
-      state->record.internal_keyword_end_samples = (record->stream_keyword_duration != 0) ? record->stream_keyword_begin + record->stream_keyword_duration : 0;
+      instance->stream_time_min_value = record->stream_time_minimum * state->record.format_in.sample_rate / 1000;
+      instance->keyword_end_samples   = (record->stream_keyword_duration != 0) ? record->stream_keyword_begin + record->stream_keyword_duration : 0;
 
       #ifdef XRAUDIO_KWD_ENABLED
-      if(record->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_SPEECH && state->record.use_hal_eos) {
+      if(record->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_SPEECH && instance->use_hal_eos) {
          if(!xraudio_hal_input_eos_cmd(state->params.hal_input_obj, XRAUDIO_EOS_CMD_SESSION_BEGIN, state->record.keyword_detector.active_chan)) {
             XLOGD_ERROR("unable to begin hal eos session");
          } else {
-            state->record.eos_hal_cmd_pending = true;
+            instance->eos_hal_cmd_pending = true;
          }
       }
       #endif
 
-      if(state->record.latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL) {
-         if(!xraudio_hal_input_stream_latency_set(state->params.hal_input_obj, state->record.latency_mode)) {
-            XLOGD_ERROR("unable to set hal input latency mode <%s>", xraudio_input_stream_latency_mode_str(state->record.latency_mode));
+      if(instance->latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL && state->record.latency_mode != instance->latency_mode) {
+         if(!xraudio_hal_input_stream_latency_set(state->params.hal_input_obj, instance->latency_mode)) {
+            XLOGD_ERROR("unable to set hal input latency mode <%s>", xraudio_stream_latency_mode_str(instance->latency_mode));
          }
+         state->record.latency_mode = instance->latency_mode;
       }
 
-      if(state->record.format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) { // Set raw mic mode
+      if(instance->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) { // Set raw mic mode
+         instance->raw_mic_enable = true;
          if(xraudio_hal_input_test_mode(state->params.hal_input_obj, true)) {
             XLOGD_INFO("hal input set to raw mic test mode");
             state->record.raw_mic_enable = true;
@@ -1163,17 +1227,14 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
             XLOGD_ERROR("unable to set hal input to raw mic test mode");
          }
          // Need to wait until non-raw audio frames have been read by xraudio before servicing the record request
-         state->record.raw_mic_frame_skip = 3;
-
-         // Must use only 1 frame in a group because raw audio is not buffered
-         state->record.frame_group_qty = 1;
+         instance->raw_mic_frame_skip = 3;
 
          #ifdef XRAUDIO_KWD_ENABLED
          // Dump pre detection samples since all audio needs to come after test mode is enabled
-         state->record.pre_detection_sample_qty = 0;
-      } else if(state->record.format_out.encoding == XRAUDIO_ENCODING_PCM && state->record.format_out.sample_size > 2) {
+         instance->pre_detection_sample_qty = 0;
+      } else if(instance->format_out.encoding == XRAUDIO_ENCODING_PCM && instance->format_out.sample_size > 2) {
          // Dump pre detection samples for 32-bit PCM since they are not available until circular buffer is converted from float to int32_t (no use case for this yet)
-         state->record.pre_detection_sample_qty = 0;
+         instance->pre_detection_sample_qty = 0;
          #endif
       }
    }
@@ -1181,20 +1242,20 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
    XLOGD_DEBUG("internal capture <%s>", (state->record.capture_internal.enabled ? "enabled" : "disabled"));
    if(state->record.capture_internal.enabled) {// Start internal capture
       // Capture input format
-      if(external) {
-         xraudio_in_capture_internal_input_begin(&state->record.external_format, decoding ? &state->record.format_out : NULL, &state->record.capture_internal, record->identifier);
+      if(external_src) {
+         xraudio_in_capture_internal_input_begin(&state->record.external_format, decoding ? &instance->format_out : NULL, &state->record.capture_internal, &instance->capture_internal, record->identifier);
       } else {
-         xraudio_in_capture_internal_input_begin(&state->record.format_in, NULL, &state->record.capture_internal, record->identifier);
+         xraudio_in_capture_internal_input_begin(&instance->format_out, NULL, &state->record.capture_internal, &instance->capture_internal, record->identifier);
       }
    }
-   if(state->record.fh != NULL) { // Record to file
-      state->record.record_callback = xraudio_in_write_to_file;
-   } else if(state->record.audio_buf_samples != NULL && state->record.audio_buf_sample_qty > 0) { // Record to memory
-      state->record.record_callback = xraudio_in_write_to_memory;
-   } else if(state->record.fifo_audio_data[0] >= 0){ // Stream to pipe
-      state->record.record_callback = xraudio_in_write_to_pipe;
-   } else if(state->record.data_callback != NULL){ // Stream to user
-      state->record.record_callback = xraudio_in_write_to_user;
+   if(instance->fifo_audio_data[0] >= 0){ // Stream to pipe
+      instance->record_callback = xraudio_in_write_to_pipe;
+   } else if(instance->fh != NULL) { // Record to file
+      instance->record_callback = xraudio_in_write_to_file;
+   } else if(instance->audio_buf_samples != NULL && instance->audio_buf_sample_qty > 0) { // Record to memory
+      instance->record_callback = xraudio_in_write_to_memory;
+   } else if(instance->data_callback != NULL){ // Stream to user
+      instance->record_callback = xraudio_in_write_to_user;
    }
 
    #ifdef XRAUDIO_DECODE_ADPCM
@@ -1217,13 +1278,15 @@ void xraudio_msg_record_stop(xraudio_thread_state_t *state, void *msg) {
 
    bool more_streams = false;
 
+   xraudio_session_record_inst_t *instance = xraudio_in_source_to_inst(&state->record, stop->source);
+
    if(stop->index >= 0 && stop->index < XRAUDIO_FIFO_QTY_MAX) {
-      if(state->record.fifo_audio_data[stop->index] >= 0) {
-         close(state->record.fifo_audio_data[stop->index]);
-         state->record.fifo_audio_data[stop->index] = -1;
+      if(instance->fifo_audio_data[stop->index] >= 0) {
+         close(instance->fifo_audio_data[stop->index]);
+         instance->fifo_audio_data[stop->index] = -1;
       }
       for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-         if(state->record.fifo_audio_data[index] >= 0) {
+         if(instance->fifo_audio_data[index] >= 0) {
             more_streams = true;
             break;
          }
@@ -1232,38 +1295,41 @@ void xraudio_msg_record_stop(xraudio_thread_state_t *state, void *msg) {
 
    if(!more_streams) {
       // Flush any partial data
-      xraudio_in_flush(state->record.source, &state->params, &state->record);
+      xraudio_in_flush(stop->source, &state->params, &state->record, instance);
 
-      if(state->record.fh != NULL) { // Record to file
-         xraudio_record_container_process_end(state->record.fh, state->record.format_out, state->record.audio_buf_index);
+      if(instance->fh != NULL) { // Record to file
+         xraudio_record_container_process_end(instance->fh, instance->format_out, instance->audio_buf_index);
       }
-      state->record.fh                        = NULL;
-      state->record.audio_buf_samples         = NULL;
-      state->record.audio_buf_sample_qty      = 0;
-      state->record.data_callback             = NULL;
+      instance->fh                        = NULL;
+      instance->audio_buf_samples         = NULL;
+      instance->audio_buf_sample_qty      = 0;
+      instance->data_callback             = NULL;
 
       for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-         state->record.fifo_audio_data[index] = -1;
+         instance->fifo_audio_data[index] = -1;
       }
 
-      xraudio_keyword_detector_session_disarm(&state->record.keyword_detector);
 
-      state->record.callback                  = NULL;
-      state->record.param                     = NULL;
+      instance->callback                  = NULL;
+      instance->param                     = NULL;
 
-      if(state->record.capture_internal.active) {
-         xraudio_in_capture_internal_end(&state->record.capture_internal);
+      if(instance->capture_internal.active) {
+         xraudio_in_capture_internal_end(&instance->capture_internal);
       }
 
-      if(state->record.raw_mic_enable) { // Clear raw mic mode
-         if(xraudio_hal_input_test_mode(state->params.hal_input_obj, false)) {
-            XLOGD_INFO("hal input restored to normal test mode");
-         } else {
-            XLOGD_ERROR("unable to restore hal input to normal test mode");
+      if(instance->raw_mic_enable) { // Clear raw mic mode
+         instance->raw_mic_enable = false;
+
+         if(state->record.raw_mic_enable) {
+            if(xraudio_hal_input_test_mode(state->params.hal_input_obj, false)) {
+               XLOGD_INFO("hal input restored to normal test mode");
+            } else {
+               XLOGD_ERROR("unable to restore hal input to normal test mode");
+            }
+            state->record.raw_mic_enable = false;
          }
-         state->record.raw_mic_enable = false;
       }
-      if(state->record.latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL) {
+      if(instance->latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL && state->record.latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL) {
          if(xraudio_hal_input_stream_latency_set(state->params.hal_input_obj, XRAUDIO_STREAM_LATENCY_NORMAL)) {
             XLOGD_INFO("hal input restored to normal latency mode");
          } else {
@@ -1280,31 +1346,31 @@ void xraudio_msg_record_stop(xraudio_thread_state_t *state, void *msg) {
          sem_post(stop->semaphore);
       }
    } else if(stop->callback != NULL){
-      (*stop->callback)(state->record.source, AUDIO_IN_CALLBACK_EVENT_OK, NULL, stop->param);
+      (*stop->callback)(stop->source, AUDIO_IN_CALLBACK_EVENT_OK, NULL, stop->param);
    }
 
    if(!more_streams) {
       #ifdef XRAUDIO_KWD_ENABLED
-      if(state->record.eos_hal_cmd_pending) { // an EOS command is pending with the HAL, so terminate the EOS session
+      if(instance->eos_hal_cmd_pending) { // an EOS command is pending with the HAL, so terminate the EOS session
          if(!xraudio_hal_input_eos_cmd(state->params.hal_input_obj, XRAUDIO_EOS_CMD_SESSION_TERMINATE, state->record.keyword_detector.active_chan)) {
             XLOGD_ERROR("unable to terminate hal eos session");
          }
-         state->record.eos_hal_cmd_pending = false;
+         instance->eos_hal_cmd_pending = false;
       }
       #endif
 
-      state->record.source                    = XRAUDIO_DEVICE_INPUT_NONE;
-      state->record.record_callback           = NULL;
+      instance->source          = XRAUDIO_DEVICE_INPUT_NONE;
+      instance->record_callback = NULL;
 
-      if(!g_voice_session.detecting) {
-         state->record.external_fd               = -1;
-         if(state->record.external_obj_hal) {
-            xraudio_hal_input_close(state->record.external_obj_hal);
-            state->record.external_obj_hal = NULL;
-         }
+      if(state->record.external_obj_hal) {
+         xraudio_hal_input_close(state->record.external_obj_hal);
+         state->record.external_obj_hal = NULL;
+         state->record.external_fd      = -1;
+
          memset(&state->record.external_format, 0, sizeof(state->record.external_format));
       }
-      g_voice_session.detecting = 0;
+
+      xraudio_in_session_group_semaphore_unlock(state, stop->source);
    }
 }
 
@@ -1692,19 +1758,28 @@ void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg) {
    xraudio_queue_msg_detect_t *detect = (xraudio_queue_msg_detect_t *)msg;
    XLOGD_DEBUG("");
 
-   state->record.synchronous               = false;
-   state->record.stream_until[0]           = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
-   state->record.callback                  = NULL;
-   state->record.param                     = NULL;
-   state->record.fh                        = NULL;
-   state->record.audio_buf_samples         = NULL;
-   state->record.audio_buf_sample_qty      = 0;
-   state->record.data_callback             = NULL;
-   state->record.fifo_audio_data[0]        = -1;
-   state->record.fifo_sound_intensity      = -1;
-   state->record.eos_event                 = XRAUDIO_EOS_EVENT_NONE;
-   state->record.eos_vad_forced            = false;
-   state->record.eos_end_of_wake_word_samples = 0;
+   xraudio_session_record_inst_t *instance = &state->record.instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+
+   instance->frame_size_out        = 0;
+   instance->frame_group_qty       = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
+   instance->record_callback       = NULL;
+   instance->stream_until[0]       = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+   instance->fifo_audio_data[0]    = -1;
+   instance->fh                    = NULL;
+   instance->audio_buf_samples     = NULL;
+   instance->audio_buf_sample_qty  = 0;
+   instance->data_callback         = NULL;
+   instance->synchronous           = false;
+   instance->callback              = NULL;
+   instance->param                 = NULL;
+   #ifdef XRAUDIO_DGA_ENABLED
+   instance->dynamic_gain_set      = false;
+   #endif
+   instance->fifo_sound_intensity  = -1;
+
+   instance->eos_event                    = XRAUDIO_EOS_EVENT_NONE;
+   instance->eos_vad_forced               = false;
+   instance->eos_end_of_wake_word_samples = 0;
 
    #ifdef XRAUDIO_KWD_ENABLED
    // Initialize the session upon receipt of first detect request which contains the sensitivity needed to start the session
@@ -1723,34 +1798,10 @@ void xraudio_msg_detect(xraudio_thread_state_t *state, void *msg) {
 
    // Set timeout for next chunk (in microseconds)
    state->record.timeout           = XRAUDIO_INPUT_FRAME_PERIOD * 1000;
-   state->record.frame_size_out    = 0;
    state->record.frame_sample_qty  = (XRAUDIO_INPUT_FRAME_PERIOD * state->record.format_in.sample_rate * state->record.format_in.channel_qty) / 1000;
-   state->record.group_sample_qty  = state->record.frame_sample_qty * XRAUDIO_INPUT_MAX_FRAME_GROUP_QTY;
-
    state->record.frame_group_index = 0;
-   state->record.frame_group_qty   = XRAUDIO_INPUT_DEFAULT_FRAME_GROUP_QTY;
-   state->record.record_callback   = NULL;
-   #ifdef XRAUDIO_DGA_ENABLED
-   state->record.dynamic_gain_set  = false;
-   #endif
-
-   if(state->record.external_obj_hal) {
-      xraudio_hal_input_close(state->record.external_obj_hal);
-      state->record.external_obj_hal = NULL;
-   }
-   state->record.external_fd       = -1;
 
    xraudio_input_sound_focus_set(state->params.obj_input, XRAUDIO_SDF_MODE_KEYWORD_DETECTION);
-   //resumeAudioIPManagerPlayout();
-
-   // Open up the voice session
-   XLOGD_INFO("resetting xraudio session state");
-   xraudio_atomic_int_set(&g_voice_session.source, XRAUDIO_DEVICE_INPUT_NONE);
-   g_voice_session.detecting         = 1; // Used to make sure we don't close HAL when detecting stops
-   g_voice_session.sources_supported = state->record.devices_input;
-   g_voice_session.msgq              = state->params.msgq;
-
-   XLOGD_DEBUG("nominal timeout %u us", state->record.timeout);
 
    if(detect->semaphore != NULL) {
       sem_post(detect->semaphore);
@@ -1790,6 +1841,26 @@ void xraudio_msg_detect_sensitivity_limits_get(xraudio_thread_state_t *state, vo
    #endif
 }
 
+void xraudio_msg_detect_stop(xraudio_thread_state_t *state, void *msg) {
+   xraudio_queue_msg_detect_stop_t *detect_stop = (xraudio_queue_msg_detect_stop_t *)msg;
+   XLOGD_DEBUG("");
+
+   xraudio_keyword_detector_t *detector = &state->record.keyword_detector;
+
+   if(!xraudio_keyword_detector_session_is_armed(detector)) {
+      XLOGD_WARN("detector is not armed");
+   } else {
+      xraudio_keyword_detector_session_disarm(detector);
+   }
+   if(detect_stop->synchronous) {
+      if(detect_stop->semaphore == NULL) {
+         XLOGD_ERROR("synchronous stop with no semaphore set!");
+      } else {
+         sem_post(detect_stop->semaphore);
+      }
+   }
+}
+
 void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
    xraudio_queue_msg_async_session_begin_t *begin = (xraudio_queue_msg_async_session_begin_t *)msg;
    XLOGD_DEBUG("");
@@ -1797,6 +1868,7 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
    xraudio_device_input_configuration_t configuration;
 
    memset(&configuration, 0, sizeof(configuration));
+
    if(xraudio_keyword_detector_session_is_armed(&state->record.keyword_detector)) {
       configuration.fd = -1;
 
@@ -1839,18 +1911,20 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
          state->record.keyword_detector.active_chan = 0;
          #endif
          #ifdef XRAUDIO_DGA_ENABLED
-         state->record.dynamic_gain_set         = true;
-         state->record.hal_kwd_peak_power_dBFS  = begin->stream_params.kwd_peak_power_dBFS;
-         state->record.dynamic_gain_pcm_bit_qty = state->record.pcm_bit_qty;
+         xraudio_session_record_inst_t *instance = &state->record.instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+
+         instance->dynamic_gain_set         = true;
+         instance->hal_kwd_peak_power_dBFS  = begin->stream_params.kwd_peak_power_dBFS;
+         instance->dynamic_gain_pcm_bit_qty = state->record.pcm_bit_qty;
 
          // calculate dynamic gain using use keyword peak power measurement from external detector
-         int16_t hal_kwd_peak_power_aop_adjusted = state->record.hal_kwd_peak_power_dBFS - (int16_t)(state->record.input_aop_adjust_dB);
-         XLOGD_INFO("peak power aop adjusted <%d dBFS>, peak power <%d dBFS>, aop_adjust <%d dB>", hal_kwd_peak_power_aop_adjusted, state->record.hal_kwd_peak_power_dBFS, (int16_t)state->record.input_aop_adjust_dB);
+         int16_t hal_kwd_peak_power_aop_adjusted = instance->hal_kwd_peak_power_dBFS - (int16_t)(state->record.input_aop_adjust_dB);
+         XLOGD_INFO("peak power aop adjusted <%d dBFS>, peak power <%d dBFS>, aop_adjust <%d dB>", hal_kwd_peak_power_aop_adjusted, instance->hal_kwd_peak_power_dBFS, (int16_t)state->record.input_aop_adjust_dB);
          float dynamic_gain;
-         xraudio_dga_update(state->record.obj_dga, &state->record.dynamic_gain_pcm_bit_qty, hal_kwd_peak_power_aop_adjusted, &dynamic_gain);
+         xraudio_dga_update(state->record.obj_dga, &instance->dynamic_gain_pcm_bit_qty, hal_kwd_peak_power_aop_adjusted, &dynamic_gain);
          dynamic_gain -= state->record.input_aop_adjust_dB;
          detector_result.channels[state->record.keyword_detector.active_chan].dynamic_gain = dynamic_gain;
-         XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", state->record.pcm_bit_qty, state->record.dynamic_gain_pcm_bit_qty);
+         XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", state->record.pcm_bit_qty, instance->dynamic_gain_pcm_bit_qty);
          #endif
 
          //xraudio_msg_record_start uses some data from state->record.keyword_detector and it's not in use now so let's borrow
@@ -1867,7 +1941,7 @@ void xraudio_msg_async_session_begin(xraudio_thread_state_t *state, void *msg) {
          }
 
          xraudio_keyword_detector_session_event(&state->record.keyword_detector, begin->source, event, NULL, begin->format);
-         memcpy(&state->record.external_format, &begin->format, sizeof(state->record.external_format));
+         state->record.external_format = begin->format;
       }
    }
 }
@@ -1885,9 +1959,9 @@ void xraudio_msg_async_input_error(xraudio_thread_state_t *state, void *msg) {
       } else {
          xraudio_process_mic_error(&state->record);
       }
-   } else if(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(error->source) != XRAUDIO_DEVICE_INPUT_NONE && XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(error->source) == xraudio_atomic_int_get(&g_voice_session.source)) {
+   } else if(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(error->source) != XRAUDIO_DEVICE_INPUT_NONE && XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(error->source) == xraudio_in_session_group_source_get(XRAUDIO_INPUT_SESSION_GROUP_DEFAULT)) {
       XLOGD_INFO("resetting xraudio session state due to input error");
-      xraudio_atomic_int_set(&g_voice_session.source, XRAUDIO_DEVICE_INPUT_NONE);
+      xraudio_atomic_int_set(&g_voice_session.source[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT], XRAUDIO_DEVICE_INPUT_NONE);
    }
 }
 
@@ -2067,7 +2141,7 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    uint8_t sample_size = (session->pcm_bit_qty > 16) ? 4 : 2;   // HAL sample size does not change even though downstream it may need to be different
 
    mic_frame_samples = chan_qty_total * XRAUDIO_INPUT_FRAME_PERIOD * session->format_in.sample_rate / 1000;
-   mic_frame_size = mic_frame_samples * sample_size;    // X channels * (20 msec @ 16kHz * (2 or 4 bytes per sample))  = 640*X bytes or 1280*X bytes per frane
+   mic_frame_size = mic_frame_samples * sample_size;    // X channels * (20 msec @ 16kHz * (2 or 4 bytes per sample))  = 640*X bytes or 1280*X bytes per frame
    uint8_t mic_frame_data[mic_frame_size];
 
    xraudio_eos_event_t eos_event_hal = XRAUDIO_EOS_EVENT_NONE;
@@ -2091,11 +2165,15 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
       session->recording = true;
       rdkx_timestamp_get(&session->timestamp_next); // Mark starting timestamp
    }
-   if(session->mode_changed) {
-      if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) == session->source && session->callback != NULL){
-         (*session->callback)(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), AUDIO_IN_CALLBACK_EVENT_FIRST_FRAME, NULL, session->param);
+   for(uint32_t group = XRAUDIO_INPUT_SESSION_GROUP_DEFAULT; group < XRAUDIO_INPUT_SESSION_GROUP_QTY; group++) {
+      xraudio_session_record_inst_t *instance = &session->instances[group];
+
+      if(instance->mode_changed) {
+         if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) == instance->source && instance->callback != NULL){
+            (*instance->callback)(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), AUDIO_IN_CALLBACK_EVENT_FIRST_FRAME, NULL, instance->param);
+         }
+         instance->mode_changed = false;
       }
-      session->mode_changed = false;
    }
 
    xraudio_input_stats_timestamp_frame_read(params->obj_input);
@@ -2120,7 +2198,8 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
       uint8_t active_chan = 0;                                       // ASR channel reserved for channel 0
       #endif
       if(session->recording && chan == active_chan) {
-         session->eos_event = eos_event;
+         xraudio_session_record_inst_t *instance = &session->instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+         instance->eos_event = eos_event;
          if(eos_event != XRAUDIO_EOS_EVENT_NONE) {
             XLOGD_DEBUG("eos event: %s", xraudio_eos_event_str(eos_event));
          }
@@ -2145,29 +2224,29 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
             eos_event = eos_event_ppr;
          }
          #endif
-         if(session->use_hal_eos) {
+         if(instance->use_hal_eos) {
             if(eos_event_hal == XRAUDIO_EOS_EVENT_NONE) {
                eos_event = XRAUDIO_EOS_EVENT_NONE;
-            } else if(!session->eos_hal_cmd_pending) {
+            } else if(!instance->eos_hal_cmd_pending) {
                XLOGD_ERROR("cmd not pending - hal eos event <%s>", xraudio_eos_event_str(eos_event_hal));
                eos_event = XRAUDIO_EOS_EVENT_NONE;
             } else {
                eos_event                    = eos_event_hal; // when HAL supports EOS, use it instead of the ppr or eos subcomponents
-               session->eos_hal_cmd_pending = false;
+               instance->eos_hal_cmd_pending = false;
             }
          }
          switch(eos_event) {
             case XRAUDIO_EOS_EVENT_ENDOFSPEECH:     event = AUDIO_IN_CALLBACK_EVENT_EOS; break;
             case XRAUDIO_EOS_EVENT_TIMEOUT_INITIAL: event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_INITIAL; break;
             case XRAUDIO_EOS_EVENT_TIMEOUT_END:     event = AUDIO_IN_CALLBACK_EVENT_EOS_TIMEOUT_END; break;
-            case XRAUDIO_EOS_EVENT_END_OF_WAKEWORD: session->eos_vad_forced = false; break;
+            case XRAUDIO_EOS_EVENT_END_OF_WAKEWORD: instance->eos_vad_forced = false; break;
             case XRAUDIO_EOS_EVENT_NONE:
             case XRAUDIO_EOS_EVENT_STARTOFSPEECH: 
             case XRAUDIO_EOS_EVENT_INVALID:       break;
          }
-         if(session->eos_vad_forced) {
-            session->eos_end_of_wake_word_samples += sample_qty_chan;
-            XLOGD_DEBUG("eos_end_of_wake_word_samples <%u>", session->eos_end_of_wake_word_samples);
+         if(instance->eos_vad_forced) {
+            instance->eos_end_of_wake_word_samples += sample_qty_chan;
+            XLOGD_DEBUG("eos_end_of_wake_word_samples <%u>", instance->eos_end_of_wake_word_samples);
          }
       }
       if(session->capture_session.active && session->capture_session.eos[chan].file.fh) {
@@ -2188,17 +2267,22 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
 
    xraudio_input_stats_timestamp_frame_sound_focus(params->obj_input);
 
-   if(session->record_callback) { // Recording
+   for(uint32_t group = XRAUDIO_INPUT_SESSION_GROUP_DEFAULT; group < XRAUDIO_INPUT_SESSION_GROUP_QTY; group++) {
+      xraudio_session_record_inst_t *instance = &session->instances[group];
 
-      session->raw_mic_frame_ptr  = mic_frame_data;
-      session->raw_mic_frame_size = mic_frame_size;
+      if(instance->record_callback != NULL) { // Recording
 
-      rc = session->record_callback(session->source, params, session);
+         session->hal_mic_frame_ptr  = mic_frame_data;
+         session->hal_mic_frame_size = mic_frame_size;
+
+         rc = instance->record_callback(instance->source, params, session, instance);
+      }
    }
+
 
    #ifdef XRAUDIO_KWD_ENABLED
    // stream audio to keyword detector
-   xraudio_in_write_to_keyword_detector(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), params, session);
+   xraudio_in_write_to_keyword_detector(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), params, session, &session->instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT]);
    #endif // XRAUDIO_KWD_ENABLED
 
    xraudio_input_stats_timestamp_frame_process(params->obj_input);
@@ -2206,8 +2290,8 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
    // Update sound intensity
    xraudio_in_sound_intensity_transfer(params, session);
 
-   // Wrap the frame group index
-   if(session->frame_group_index >= session->frame_group_qty) {
+   // Wrap the frame group index (based on default group's group qty)
+   if(session->frame_group_index >= session->instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT].frame_group_qty) {
       session->frame_group_index = 0;
    }
 
@@ -2231,34 +2315,36 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
 
    xraudio_input_stats_timestamp_frame_end(params->obj_input);
 
-   if(session->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_SPEECH && event != AUDIO_IN_CALLBACK_EVENT_OK) { // Session ended, notify
+   xraudio_session_record_inst_t *instance = &session->instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+
+   if(instance->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_SPEECH && event != AUDIO_IN_CALLBACK_EVENT_OK) { // Session ended, notify
 
       // Flush any partial data
-      xraudio_in_flush(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), params, session);
+      xraudio_in_flush(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), params, session, instance);
       session->frame_group_index = 0;
 
       for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-         if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
+         if(instance->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
             XLOGD_DEBUG("Close write side of pipe to send EOF to read side");
-            close(session->fifo_audio_data[index]);
-            session->fifo_audio_data[index] = -1;
+            close(instance->fifo_audio_data[index]);
+            instance->fifo_audio_data[index] = -1;
          }
-         session->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
-
-      }
-      if(session->fh != NULL) {
-         xraudio_record_container_process_end(session->fh, session->format_out, session->audio_buf_index);
+         instance->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
       }
 
-      if(session->synchronous) {
-         if(session->semaphore == NULL) {
+      if(instance->fh != NULL) {
+         xraudio_record_container_process_end(instance->fh, instance->format_out, instance->audio_buf_index);
+      }
+
+      if(instance->synchronous) {
+         if(instance->semaphore == NULL) {
             XLOGD_ERROR("synchronous record with no semaphore set!");
          } else {
-            sem_post(session->semaphore);
-            session->semaphore = NULL;
+            sem_post(instance->semaphore);
+            instance->semaphore = NULL;
          }
-      } else if(session->callback != NULL) {
-         if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->source) != XRAUDIO_DEVICE_INPUT_NONE) {
+      } else if(instance->callback != NULL) {
+         if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(instance->source) != XRAUDIO_DEVICE_INPUT_NONE) {
             xraudio_hal_input_stats_t input_stats = { 0 };
 
             // Read statistics from the hal which were reset at the point to start counting
@@ -2266,35 +2352,39 @@ void xraudio_process_mic_data(xraudio_main_thread_params_t *params, xraudio_sess
                XLOGD_ERROR("unable to read input stats!");
             } else {
                // Determine how many samples were lost from keyword end to end of stream
-               session->internal_session_stats.samples_lost         = input_stats.samples_lost;
-               session->internal_session_stats.samples_buffered_max = input_stats.samples_buffered_max;
+               instance->stats.samples_lost         = input_stats.samples_lost;
+               instance->stats.samples_buffered_max = input_stats.samples_buffered_max;
 
                XLOGD_DEBUG("HAL samples buffered max <%u> lost <%u>", input_stats.samples_buffered_max, input_stats.samples_lost);
             }
 
-            (*session->callback)(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->source), event, &session->internal_session_stats, session->param);
+            (*instance->callback)(XRAUDIO_DEVICE_INPUT_LOCAL_GET(instance->source), event, &instance->stats, instance->param);
          }
       }
       // Clear the session so no further incoming data is processed
-      session->fh                       = NULL;
-      session->audio_buf_samples        = NULL;
-      session->audio_buf_sample_qty     = 0;
-      session->audio_buf_index          = 0;
+      instance->fh                       = NULL;
+      instance->audio_buf_samples        = NULL;
+      instance->audio_buf_sample_qty     = 0;
+      instance->audio_buf_index          = 0;
    }
 }
 
 void xraudio_process_mic_error(xraudio_session_record_t *session) {
-   if(session->synchronous) {
-      if(session->semaphore == NULL) {
-         XLOGD_ERROR("synchronous record with no semaphore set!");
-      } else {
-         sem_post(session->semaphore);
-         session->semaphore = NULL;
+   for(uint32_t group = XRAUDIO_INPUT_SESSION_GROUP_DEFAULT; group < XRAUDIO_INPUT_SESSION_GROUP_QTY; group++) {
+      xraudio_session_record_inst_t *instance = &session->instances[group];
+
+      if(instance->synchronous) {
+         if(instance->semaphore == NULL) {
+            XLOGD_ERROR("synchronous record with no semaphore set!");
+         } else {
+            sem_post(instance->semaphore);
+            instance->semaphore = NULL;
+         }
+      } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) == instance->source && instance->callback != NULL) {
+         (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_ERROR, NULL, instance->param);
+      } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) != XRAUDIO_DEVICE_INPUT_NONE && xraudio_keyword_detector_session_is_armed(&session->keyword_detector)) {
+         xraudio_keyword_detector_session_event(&session->keyword_detector, XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), KEYWORD_CALLBACK_EVENT_ERROR, NULL, session->format_in);
       }
-   } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) == session->source && session->callback != NULL) {
-      (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_ERROR, NULL, session->param);
-   } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) != XRAUDIO_DEVICE_INPUT_NONE && xraudio_keyword_detector_session_is_armed(&session->keyword_detector)) {
-      xraudio_keyword_detector_session_event(&session->keyword_detector, XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), KEYWORD_CALLBACK_EVENT_ERROR, NULL, session->format_in);
    }
    session->recording = false;
 }
@@ -2369,18 +2459,21 @@ void xraudio_unpack_multi_int32(xraudio_session_record_t *session, void *buffer_
    }
 }
 
-void xraudio_in_flush(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
-   session->frame_group_qty = 1;
-   if(session->record_callback) { // Record to file
-      session->record_callback(source, params, session);
+void xraudio_in_flush(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance) {
+   if(source != XRAUDIO_DEVICE_INPUT_MIC_TAP) {
+      instance->frame_group_qty = 1;
+   }
+
+   if(instance->record_callback) { // Call the record handler to handle all the pending data
+      instance->record_callback(source, params, session, instance);
    }
 }
 
-int xraudio_in_write_to_file(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
+int xraudio_in_write_to_file(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance) {
    uint8_t *frame_buffer      = NULL;
    uint32_t frame_size        = 0;
    uint8_t  frame_group_index = 0;
-   if(source != session->source) {
+   if(source != instance->source) {
       XLOGD_DEBUG("different source is being recorded");
       return(0);
    }
@@ -2399,26 +2492,26 @@ int xraudio_in_write_to_file(xraudio_devices_input_t source, xraudio_main_thread
       #endif
 
       frame_buffer      = (uint8_t *)&session->frame_buffer_int16[chan].frames[0];
-      frame_size        = session->frame_size_out;
+      frame_size        = instance->frame_size_out;
       frame_group_index = session->frame_group_index;
    }
-   if(frame_group_index >= session->frame_group_qty) {
+   if(frame_group_index >= instance->frame_group_qty) {
       // Write requested size into file
-      size_t bytes_written = fwrite(frame_buffer, 1, frame_size * frame_group_index, session->fh);
+      size_t bytes_written = fwrite(frame_buffer, 1, frame_size * frame_group_index, instance->fh);
 
       if(bytes_written != (frame_size * frame_group_index)) {
          XLOGD_ERROR("Error (%zd)", bytes_written);
          return(-1);
       }
 
-      session->audio_buf_index += (frame_size * frame_group_index);
+      instance->audio_buf_index += (frame_size * frame_group_index);
    }
 
    return(0);
 }
 
 #ifdef XRAUDIO_KWD_ENABLED
-int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
+int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance) {
    uint32_t frame_group_index = session->frame_group_index - 1;
    xraudio_devices_input_t device_input_local = XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input);
 
@@ -2479,7 +2572,7 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
       }
 
       if(detector_chan->triggered) {
-         if(!session->eos_vad_forced) {   // don't increment post frame counts if EOS enabled and looking for end of wake word
+         if(!instance->eos_vad_forced) {   // don't increment post frame counts if EOS enabled and looking for end of wake word
             detector_chan->post_frame_count++;
          }
       } else if(detected) {
@@ -2567,10 +2660,10 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
 
    // inform EOS detector that keyword was detected for case when extended end of keyword detection IS enabled
    if(detector->triggered && detector_chan->endpoints.end_of_wuw_ext_enabled){
-      if(session->eos_event == XRAUDIO_EOS_EVENT_END_OF_WAKEWORD) {
+      if(instance->eos_event == XRAUDIO_EOS_EVENT_END_OF_WAKEWORD) {
          // EOS reports end of wake word. Adjust end of wakeword result then proceed with reporting keyword detection event
-         detector->result.endpoints.begin -= session->eos_end_of_wake_word_samples;
-      } else if(session->eos_vad_forced) {
+         detector->result.endpoints.begin -= instance->eos_end_of_wake_word_samples;
+      } else if(instance->eos_vad_forced) {
          // wait to report detection event until end of wake word (vad forced flag is cleared)
          detector->post_frame_count_trigger--;     // correct for extra count while looping
          return(0);
@@ -2579,9 +2672,9 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
          xraudio_input_eos_state_set_speech_begin(params->obj_input);
          xraudio_input_ppr_state_set_speech_begin(params->obj_input);
          #ifdef XRAUDIO_EOS_ENABLED
-         if(params->dsp_config.eos_enabled && !session->use_hal_eos) {
+         if(params->dsp_config.eos_enabled && !instance->use_hal_eos) {
             // notify EOS, if enabled, to begin looking for end of wake word (not used for HAL EOS detector)
-            session->eos_vad_forced = true;
+            instance->eos_vad_forced = true;
             detector->post_frame_count_trigger--;  // correct for extra count while looping
             return(0);
          }
@@ -2599,14 +2692,14 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
       return(0);
    }
 
-   if(!xraudio_in_session_voice_get(source)) {
+   if(!xraudio_in_session_group_semaphore_lock(source)) {
       XLOGD_ERROR("could not acquire session");
       return(0);
    }
 
    #ifdef XRAUDIO_DGA_ENABLED
    if(session->dynamic_gain_enabled && params->dsp_config.dga_enabled) {
-      session->dynamic_gain_set = true;
+      instance->dynamic_gain_set = true;
 
 
       uint32_t begin = -detector->result.endpoints.begin;
@@ -2661,12 +2754,12 @@ int xraudio_in_write_to_keyword_detector(xraudio_devices_input_t source, xraudio
 
          uint32_t  frame_qty = (samples[0] != NULL) + (samples[1] != NULL);
 
-         session->dynamic_gain_pcm_bit_qty = session->pcm_bit_qty;
+         instance->dynamic_gain_pcm_bit_qty = session->pcm_bit_qty;
          float dynamic_gain;
-         xraudio_dga_calculate(session->obj_dga, &session->dynamic_gain_pcm_bit_qty, frame_qty, (const float **)samples, sample_qty, &dynamic_gain);
+         xraudio_dga_calculate(session->obj_dga, &instance->dynamic_gain_pcm_bit_qty, frame_qty, (const float **)samples, sample_qty, &dynamic_gain);
          dynamic_gain -= session->input_aop_adjust_dB;
          detector->result.channels[detector->active_chan].dynamic_gain = dynamic_gain;
-         XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", session->pcm_bit_qty, session->dynamic_gain_pcm_bit_qty);
+         XLOGD_DEBUG("pcm bit qty in <%u> out <%u>", session->pcm_bit_qty, instance->dynamic_gain_pcm_bit_qty);
       }
    }
    #endif
@@ -2735,11 +2828,11 @@ uint32_t xraudio_keyword_detector_session_pd_avail(xraudio_keyword_detector_t *d
 
 #endif
 
-int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
+int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance) {
    uint8_t *frame_buffer      = NULL;
    uint32_t frame_size        = 0;
    uint8_t  frame_group_index = 0;
-   if(source != session->source) {
+   if(source != instance->source) {
       XLOGD_DEBUG("different source is being recorded");
       return(0);
    }
@@ -2758,26 +2851,26 @@ int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thre
 
       // Local source, set frame vars
       frame_buffer      = (uint8_t *)&session->frame_buffer_int16[chan].frames[0];
-      frame_size        = session->frame_size_out;
+      frame_size        = instance->frame_size_out;
       frame_group_index = session->frame_group_index;
    }
 
-   if(frame_group_index >= session->frame_group_qty) {
-      if(session->audio_buf_index + (frame_size * frame_group_index) > (session->audio_buf_sample_qty * session->format_out.sample_size * frame_group_index)) {
+   if(frame_group_index >= instance->frame_group_qty) {
+      if(instance->audio_buf_index + (frame_size * frame_group_index) > (instance->audio_buf_sample_qty * instance->format_out.sample_size * frame_group_index)) {
          XLOGD_DEBUG("End of buffer reached");
 
-         if(session->callback != NULL){
-            (*session->callback)(source, AUDIO_IN_CALLBACK_EVENT_END_OF_BUFFER, NULL, session->param);
+         if(instance->callback != NULL){
+            (*instance->callback)(source, AUDIO_IN_CALLBACK_EVENT_END_OF_BUFFER, NULL, instance->param);
          }
-         session->audio_buf_samples    = NULL;
-         session->audio_buf_sample_qty = 0;
-         session->audio_buf_index      = 0;
+         instance->audio_buf_samples    = NULL;
+         instance->audio_buf_sample_qty = 0;
+         instance->audio_buf_index      = 0;
       } else {
-         unsigned long sample_index = session->audio_buf_index / session->format_out.sample_size;
+         unsigned long sample_index = instance->audio_buf_index / instance->format_out.sample_size;
          size_t            data_size  = frame_size * frame_group_index;
          xraudio_sample_t *samples    = (xraudio_sample_t *)frame_buffer;
          #ifdef XRAUDIO_DGA_ENABLED
-         if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
+         if(instance->dynamic_gain_set && params->dsp_config.dga_enabled) {
             uint8_t chan = 0;
             #if defined(XRAUDIO_KWD_ENABLED)
             if(params->dsp_config.input_asr_max_channel_qty == 0) {
@@ -2789,20 +2882,20 @@ int xraudio_in_write_to_memory(xraudio_devices_input_t source, xraudio_main_thre
             // Apply gain to group of audio frames
             xraudio_dga_apply(session->obj_dga, frame_buffer_fp32, sample_qty * frame_group_index);
             // Convert float to int16
-            xraudio_samples_convert_fp32_int16(samples, frame_buffer_fp32, sample_qty * frame_group_index, session->dynamic_gain_pcm_bit_qty);
+            xraudio_samples_convert_fp32_int16(samples, frame_buffer_fp32, sample_qty * frame_group_index, instance->dynamic_gain_pcm_bit_qty);
          }
          #endif
 
-         memcpy(&session->audio_buf_samples[sample_index], samples, data_size);
+         memcpy(&instance->audio_buf_samples[sample_index], samples, data_size);
 
-         session->audio_buf_index += (frame_size * frame_group_index);
+         instance->audio_buf_index += (frame_size * frame_group_index);
       }
    }
 
    return(frame_size);
 }
 
-int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
+int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance) {
    int rc = 0;
    uint8_t chan = (source == XRAUDIO_DEVICE_INPUT_TRI) ? 1 : 0; // default to center channel for TRI beam, otherwise use first channel
    int16_t *frame_buffer_int16 = NULL;
@@ -2812,8 +2905,9 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
    uint32_t frame_size_int16   = 0;
    uint8_t  frame_group_index  = 0;
    bool     flush_audio_data   = false;
-   if((XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(source) != session->source) && (XRAUDIO_DEVICE_INPUT_LOCAL_GET(source) != session->source)) {
-      XLOGD_DEBUG("different source is being recorded");
+   if((XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(source) != instance->source) && (XRAUDIO_DEVICE_INPUT_LOCAL_GET(source) != instance->source)) {
+      XLOGD_WARN("different source <%s> is being recorded", xraudio_devices_input_str(instance->source));
+      XLOGD_WARN("requested source <%s>", xraudio_devices_input_str(source));
       return(0);
    }
    #if defined(XRAUDIO_KWD_ENABLED)
@@ -2827,9 +2921,9 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
       frame_size_int16   = session->external_frame_size_out;
       frame_group_index  = session->external_frame_group_index;
 
-      if(session->keyword_flush) { // keyword was just passed
+      if(instance->keyword_flush) { // keyword was just passed
          flush_audio_data = true;
-         session->keyword_flush = false;
+         instance->keyword_flush = false;
       }
    } else {
       #if defined(XRAUDIO_KWD_ENABLED)
@@ -2844,30 +2938,30 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
       #ifdef XRAUDIO_DGA_ENABLED
       frame_buffer_fp32  = &session->frame_buffer_fp32[chan].frames[0].samples[0];
       #endif
-      frame_size_int16   = session->frame_size_out;
+      frame_size_int16   = instance->frame_size_out;
       frame_group_index  = session->frame_group_index;
    }
 
    #ifdef XRAUDIO_KWD_ENABLED
    xraudio_keyword_detector_t *detector = &session->keyword_detector;
 
-   if(session->pre_detection_sample_qty > 0) { // Write pre-detection data to pipe
+   if(instance->pre_detection_sample_qty > 0) { // Write pre-detection data to pipe
       float   *chunk_1_samples_fp32 = NULL;
       float   *chunk_2_samples_fp32 = NULL;
       uint32_t chunk_1_sample_qty   = 0;
       uint32_t chunk_2_sample_qty   = 0;
 
       if(!is_external) {
-         xraudio_in_pre_detection_chunks(&detector->channels[detector->active_chan], session->pre_detection_sample_qty, 0, &chunk_1_samples_fp32, &chunk_1_sample_qty, &chunk_2_samples_fp32, &chunk_2_sample_qty);
+         xraudio_in_pre_detection_chunks(&detector->channels[detector->active_chan], instance->pre_detection_sample_qty, 0, &chunk_1_samples_fp32, &chunk_1_sample_qty, &chunk_2_samples_fp32, &chunk_2_sample_qty);
          XLOGD_DEBUG("chunk 1 %u chunk 2 %u", chunk_1_sample_qty, chunk_2_sample_qty);
 
          XLOGD_DEBUG("prepending keyword utterance from channel <%u> instance <%u> to stream", detector->active_chan, detector->active_chan - params->dsp_config.input_asr_max_channel_qty);
 
          if(chunk_1_sample_qty) {
             #ifdef XRAUDIO_DGA_ENABLED
-            if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
+            if(instance->dynamic_gain_set && params->dsp_config.dga_enabled) {
                xraudio_dga_apply(session->obj_dga, chunk_1_samples_fp32, chunk_1_sample_qty);
-               bit_qty = session->dynamic_gain_pcm_bit_qty;
+               bit_qty = instance->dynamic_gain_pcm_bit_qty;
             }
             #endif
             int16_t *chunk_1_samples_int16 = (int16_t *)chunk_1_samples_fp32; // use same buffer
@@ -2877,19 +2971,19 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
 
             uint32_t size = chunk_1_sample_qty * sizeof(int16_t);
             for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-               if(session->fifo_audio_data[index] < 0) {
+               if(instance->fifo_audio_data[index] < 0) {
                   break;
                }
                errno = 0;
-               rc = write(session->fifo_audio_data[index], chunk_1_samples_int16, size);
+               rc = write(instance->fifo_audio_data[index], chunk_1_samples_int16, size);
                if(rc != (int)size) {
                   int errsv = errno;
                   if(errsv == EAGAIN || errsv == EWOULDBLOCK) { // Data is lost due to insufficient space in the pipe
-                     if(session->callback != NULL){
-                        (*session->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, session->param);
+                     if(instance->callback != NULL){
+                        (*instance->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, instance->param);
                      }
                   } else {
-                     XLOGD_ERROR("unable to write fifo <%d> <%s>", session->fifo_audio_data[index], strerror(errsv));
+                     XLOGD_ERROR("unable to write fifo <%d> <%s>", instance->fifo_audio_data[index], strerror(errsv));
                   }
                }
             }
@@ -2899,18 +2993,18 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
                   session->capture_session.active = false;
                }
             }
-            if(session->capture_internal.active) {
-               int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)chunk_1_samples_int16, size, &session->capture_internal.native);
+            if(instance->capture_internal.active) {
+               int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)chunk_1_samples_int16, size, &instance->capture_internal.native);
                if(rc_cap < 0) {
-                  xraudio_in_capture_internal_end(&session->capture_internal);
+                  xraudio_in_capture_internal_end(&instance->capture_internal);
                }
             }
          }
          if(chunk_2_sample_qty) {
             #ifdef XRAUDIO_DGA_ENABLED
-            if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
+            if(instance->dynamic_gain_set && params->dsp_config.dga_enabled) {
                xraudio_dga_apply(session->obj_dga, chunk_2_samples_fp32, chunk_2_sample_qty);
-               bit_qty = session->dynamic_gain_pcm_bit_qty;
+               bit_qty = instance->dynamic_gain_pcm_bit_qty;
             }
             #endif
             int16_t *chunk_2_samples_int16 = (int16_t *)chunk_2_samples_fp32; // use same buffer
@@ -2920,20 +3014,20 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
 
             uint32_t size = chunk_2_sample_qty * sizeof(int16_t);
             for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-               if(session->fifo_audio_data[index] < 0) {
+               if(instance->fifo_audio_data[index] < 0) {
                   break;
                }
                errno = 0;
-               rc = write(session->fifo_audio_data[index], chunk_2_samples_int16, size);
+               rc = write(instance->fifo_audio_data[index], chunk_2_samples_int16, size);
 
                if(rc != (int)size) {
                   int errsv = errno;
                   if(errsv == EAGAIN || errsv == EWOULDBLOCK) { // Data is lost due to insufficient space in the pipe
-                     if(session->callback != NULL){
-                        (*session->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, session->param);
+                     if(instance->callback != NULL){
+                        (*instance->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, instance->param);
                      }
                   } else {
-                     XLOGD_ERROR("unable to write fifo <%d> <%s>", session->fifo_audio_data[index], strerror(errsv));
+                     XLOGD_ERROR("unable to write fifo <%d> <%s>", instance->fifo_audio_data[index], strerror(errsv));
                   }
                }
             }
@@ -2943,68 +3037,68 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
                   session->capture_session.active = false;
                }
             }
-            if(session->capture_internal.active) {
-               int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)chunk_2_samples_int16, size, &session->capture_internal.native);
+            if(instance->capture_internal.active) {
+               int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)chunk_2_samples_int16, size, &instance->capture_internal.native);
                if(rc_cap < 0) {
-                  xraudio_in_capture_internal_end(&session->capture_internal);
+                  xraudio_in_capture_internal_end(&instance->capture_internal);
                }
             }
          }
 
-         session->internal_session_stats.packets_processed = 1; // keyword counts as 1 packet
-         session->internal_session_stats.samples_processed = session->pre_detection_sample_qty;
+         instance->stats.packets_processed = 1; // keyword counts as 1 packet
+         instance->stats.samples_processed = instance->pre_detection_sample_qty;
 
-         session->pre_detection_sample_qty = 0;
+         instance->pre_detection_sample_qty = 0;
       }
    }
    #endif
 
    if(!is_external) { // increment session stats for internal source
-      session->internal_session_stats.packets_processed++;
-      session->internal_session_stats.samples_processed += (frame_size_int16 / sizeof(int16_t));
+      instance->stats.packets_processed++;
+      instance->stats.samples_processed += (frame_size_int16 / sizeof(int16_t));
 
-      if((session->internal_sample_qty_min > 0) && (session->internal_session_stats.samples_processed >= session->internal_sample_qty_min)) {
-         if(session->callback) {
-            (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_STREAM_TIME_MINIMUM, NULL, session->param);
+      if((instance->stream_time_min_value > 0) && (instance->stats.samples_processed >= instance->stream_time_min_value)) {
+         if(instance->callback) {
+            (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_STREAM_TIME_MINIMUM, NULL, instance->param);
          }
-         session->internal_sample_qty_min = 0;
+         instance->stream_time_min_value = 0;
       }
 
-      if((session->internal_keyword_end_samples > 0) && (session->internal_session_stats.samples_processed >= session->internal_keyword_end_samples)) {
-         if(session->callback != NULL) {
+      if((instance->keyword_end_samples > 0) && (instance->stats.samples_processed >= instance->keyword_end_samples)) {
+         if(instance->callback != NULL) {
             xraudio_stream_keyword_info_t kwd_info;
-            kwd_info.byte_qty = session->internal_keyword_end_samples;
-            (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_STREAM_KWD_INFO, &kwd_info, session->param);
+            kwd_info.byte_qty = instance->keyword_end_samples;
+            (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_STREAM_KWD_INFO, &kwd_info, instance->param);
          }
-         session->internal_keyword_end_samples = 0;
-         session->keyword_flush                = true;
+         instance->keyword_end_samples = 0;
+         instance->keyword_flush       = true;
       }
    }
 
-   if(frame_group_index >= session->frame_group_qty || flush_audio_data) {
-      if(session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW && session->raw_mic_frame_skip > 0) {
-         session->raw_mic_frame_skip--;
+   if(frame_group_index >= instance->frame_group_qty || flush_audio_data) {
+      if(instance->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW && instance->raw_mic_frame_skip > 0) {
+         instance->raw_mic_frame_skip--;
       } else {
          size_t data_size;
          void * data_ptr;
 
-         if(session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) {
-            data_size = session->raw_mic_frame_size;
-            data_ptr  = session->raw_mic_frame_ptr;
-         } else if(session->format_out.encoding == XRAUDIO_ENCODING_PCM && session->format_out.sample_size == 4) { // 32-bit PCM
-            if(session->format_out.channel_qty > 1) { // All channels
-               data_size = session->raw_mic_frame_size;
-               data_ptr  = session->raw_mic_frame_ptr;
+         if(instance->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) {
+            data_size = session->hal_mic_frame_size;
+            data_ptr  = session->hal_mic_frame_ptr;
+         } else if(instance->format_out.encoding == XRAUDIO_ENCODING_PCM && instance->format_out.sample_size == 4) { // 32-bit PCM
+            if(instance->format_out.channel_qty > 1) { // All channels
+               data_size = session->hal_mic_frame_size;
+               data_ptr  = session->hal_mic_frame_ptr;
             } else { // Single channel
-               data_size = session->frame_size_out;
-               data_ptr  = &session->raw_mic_frame_ptr[data_size * chan];
+               data_size = instance->frame_size_out;
+               data_ptr  = &session->hal_mic_frame_ptr[data_size * chan];
             }
          } else {
             data_size = frame_size_int16 * frame_group_index;
             data_ptr  = frame_buffer_int16;
 
             #ifdef XRAUDIO_DGA_ENABLED
-            if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
+            if(instance->dynamic_gain_set && params->dsp_config.dga_enabled) {
                uint32_t sample_qty = data_size / sizeof(int16_t);
                float frame_buffer_temp[sample_qty];
 
@@ -3015,38 +3109,38 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
                // Apply gain to group of audio frames
                xraudio_dga_apply(session->obj_dga, frame_buffer_temp, sample_qty);
                // Convert float to int16
-               xraudio_samples_convert_fp32_int16(frame_buffer_int16, frame_buffer_temp, sample_qty, session->dynamic_gain_pcm_bit_qty);
+               xraudio_samples_convert_fp32_int16(frame_buffer_int16, frame_buffer_temp, sample_qty, instance->dynamic_gain_pcm_bit_qty);
             }
             #endif
          }
 
          for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
             //XLOGD_DEBUG("streaming channel %d", chan);
-            if(session->fifo_audio_data[index] < 0) {
+            if(instance->fifo_audio_data[index] < 0) {
                break;
             }
-            
+            //XLOGD_INFO("src <%s> pipe <%d> size <%u> hal_mic_frame_size <%u> frame_size_out <%u>", xraudio_devices_input_str(source), instance->fifo_audio_data[index], data_size, session->hal_mic_frame_size, instance->frame_size_out);
             errno = 0;
-            rc = write(session->fifo_audio_data[index], data_ptr, data_size);
+            rc = write(instance->fifo_audio_data[index], data_ptr, data_size);
 
             if(rc != (int)(data_size)) {
                int errsv = errno;
                if(errsv == EAGAIN || errsv == EWOULDBLOCK) {
                   // Data is lost due to insufficient space in the pipe
                   rc = 0;
-                  if(session->callback != NULL){
-                     (*session->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, session->param);
+                  if(instance->callback != NULL){
+                     (*instance->callback)(source, AUDIO_IN_CALLBACK_EVENT_OVERFLOW, NULL, instance->param);
                   }
                } else {
-                  XLOGD_ERROR("unable to write fifo %d <%s>", session->fifo_audio_data[index], strerror(errsv));
+                  XLOGD_ERROR("unable to write fifo %d <%s>", instance->fifo_audio_data[index], strerror(errsv));
                }
-            } else if(flush_audio_data && session->stream_until[index] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_KEYWORD) {
-               if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
+            } else if(flush_audio_data && instance->stream_until[index] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_KEYWORD) {
+               if(instance->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
                   XLOGD_DEBUG("Close write side of pipe to send EOF to read side");
-                  close(session->fifo_audio_data[index]);
-                  session->fifo_audio_data[index] = -1;
+                  close(instance->fifo_audio_data[index]);
+                  instance->fifo_audio_data[index] = -1;
                }
-               session->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+               instance->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
             }
          }
          if(session->capture_session.active && session->capture_session.output.file.fh) {
@@ -3058,10 +3152,10 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
             }
          }
 
-         if(session->capture_internal.active && (session->external_format.encoding == ((session->format_out.encoding == XRAUDIO_ENCODING_PCM_RAW) ? XRAUDIO_ENCODING_PCM : session->format_out.encoding))) {
-            int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)data_ptr, data_size, &session->capture_internal.native);
+         if(instance->capture_internal.active && !is_external) {
+            int rc_cap = xraudio_in_capture_internal_to_file(session, (uint8_t *)data_ptr, data_size, &instance->capture_internal.native);
             if(rc_cap < 0) {
-               xraudio_in_capture_internal_end(&session->capture_internal);
+               xraudio_in_capture_internal_end(&instance->capture_internal);
             }
          }
       }
@@ -3070,12 +3164,12 @@ int xraudio_in_write_to_pipe(xraudio_devices_input_t source, xraudio_main_thread
    return(rc);
 }
 
-int xraudio_in_write_to_user(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
+int xraudio_in_write_to_user(xraudio_devices_input_t source, xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_session_record_inst_t *instance) {
    int rc = 0;
    uint8_t *frame_buffer      = NULL;
    uint8_t  frame_group_index = 0;
    uint32_t sample_qty        = 0;
-   if(source != session->source) {
+   if(source != instance->source) {
       XLOGD_DEBUG("different source is being recorded");
       return(0);
    }
@@ -3099,11 +3193,11 @@ int xraudio_in_write_to_user(xraudio_devices_input_t source, xraudio_main_thread
       sample_qty        = session->frame_sample_qty;
    }
 
-   if(frame_group_index >= session->frame_group_qty) {
+   if(frame_group_index >= instance->frame_group_qty) {
       errno = 0;
       xraudio_sample_t *samples = (xraudio_sample_t *)frame_buffer;
       #ifdef XRAUDIO_DGA_ENABLED
-      if(session->dynamic_gain_set && params->dsp_config.dga_enabled) {
+      if(instance->dynamic_gain_set && params->dsp_config.dga_enabled) {
          uint8_t chan = 0;
          #if defined(XRAUDIO_KWD_ENABLED)
          if(params->dsp_config.input_asr_max_channel_qty == 0) {
@@ -3114,42 +3208,52 @@ int xraudio_in_write_to_user(xraudio_devices_input_t source, xraudio_main_thread
          // Apply gain to group of audio frames
          xraudio_dga_apply(session->obj_dga, frame_buffer_fp32, sample_qty * frame_group_index);
          // Convert float to int16
-         xraudio_samples_convert_fp32_int16(samples, frame_buffer_fp32, sample_qty * frame_group_index, session->dynamic_gain_pcm_bit_qty);
+         xraudio_samples_convert_fp32_int16(samples, frame_buffer_fp32, sample_qty * frame_group_index, instance->dynamic_gain_pcm_bit_qty);
       }
       #endif
 
-      rc = (*session->data_callback)(source, samples, sample_qty * frame_group_index, session->param);
+      rc = (*instance->data_callback)(source, samples, sample_qty * frame_group_index, instance->param);
    }
 
    return(rc);
 }
 
 void xraudio_in_sound_intensity_transfer(xraudio_main_thread_params_t *params, xraudio_session_record_t *session) {
-   if(session->fifo_sound_intensity < 0) {
-      return;
-   }
-   uint16_t buf[2];
-   uint8_t active_chan = 0;
-   #if defined(XRAUDIO_KWD_ENABLED)
-   if(params->dsp_config.input_asr_max_channel_qty == 0) {
-      active_chan = session->keyword_detector.active_chan;
-   }
-   #endif
+   for(uint32_t group = XRAUDIO_INPUT_SESSION_GROUP_DEFAULT; group < XRAUDIO_INPUT_SESSION_GROUP_QTY; group++) {
+      xraudio_session_record_inst_t *instance = &session->instances[group];
 
-   uint16_t intensity = xraudio_input_signal_level_get(params->obj_input, active_chan);
-   uint16_t direction = xraudio_input_signal_direction_get(params->obj_input);
+      if(instance->fifo_sound_intensity < 0) {
+         continue;
+      }
+      uint16_t buf[2];
+      uint8_t active_chan = 0;
 
-   //XLOGD_DEBUG("intensity %u%% %f sum %llu sample qty %lu", intensity, mean_intensity, sum, session->sample_qty);
+      #if defined(XRAUDIO_KWD_ENABLED)
+      if(params->dsp_config.input_asr_max_channel_qty == 0) {
+         active_chan = session->keyword_detector.active_chan;
+      }
+      #endif
+      #ifdef MICROPHONE_TAP_ENABLED
+      if(group == XRAUDIO_INPUT_SESSION_GROUP_MIC_TAP) {
+         active_chan = 1; // default to center channel for MIC TAP
+      }
+      #endif
 
-   // Write to fifo (use host endianness)
-   buf[0] = intensity;
-   buf[1] = direction;
+      uint16_t intensity = xraudio_input_signal_level_get(params->obj_input, active_chan);
+      uint16_t direction = xraudio_input_signal_direction_get(params->obj_input);
 
-   errno = 0;
-   int rc = write(session->fifo_sound_intensity, buf, sizeof(buf));
-   if ((rc != sizeof(buf)) && (errno != EWOULDBLOCK)) {
-      int errsv = errno;
-      XLOGD_ERROR("unable to write fifo %d <%s> : error  %d", session->fifo_sound_intensity, strerror(errsv), errsv);
+      //XLOGD_DEBUG("intensity %u%% %f sum %llu sample qty %lu", intensity, mean_intensity, sum, session->sample_qty);
+
+      // Write to fifo (use host endianness)
+      buf[0] = intensity;
+      buf[1] = direction;
+
+      errno = 0;
+      int rc = write(instance->fifo_sound_intensity, buf, sizeof(buf));
+      if ((rc != sizeof(buf)) && (errno != EWOULDBLOCK)) {
+         int errsv = errno;
+         XLOGD_ERROR("unable to write fifo %d <%s> : error  %d", instance->fifo_sound_intensity, strerror(errsv), errsv);
+      }
    }
 }
 
@@ -3342,7 +3446,7 @@ bool xraudio_keyword_detector_session_is_armed(xraudio_keyword_detector_t *detec
 }
 
 void xraudio_keyword_detector_session_event(xraudio_keyword_detector_t *detector, xraudio_devices_input_t source, keyword_callback_event_t event, xraudio_keyword_detector_result_t *detector_result, xraudio_input_format_t format) {
-   int current_source = xraudio_atomic_int_get(&g_voice_session.source);
+   xraudio_devices_input_t current_source = xraudio_in_session_group_source_get(XRAUDIO_INPUT_SESSION_GROUP_DEFAULT);
 
    if(!xraudio_keyword_detector_session_is_armed(detector)) {
       XLOGD_ERROR("detector is not armed");
@@ -3360,17 +3464,6 @@ void xraudio_keyword_detector_session_event(xraudio_keyword_detector_t *detector
 
    detector->callback(source, event, detector->cb_param, detector_result, format);
    xraudio_keyword_detector_session_disarm(detector);
-}
-
-bool xraudio_in_session_voice_get(xraudio_devices_input_t source) {
-   if(xraudio_atomic_compare_and_set(&g_voice_session.source, XRAUDIO_DEVICE_INPUT_NONE, source)) {
-      XLOGD_INFO("Voice Session acquired for source %s", xraudio_devices_input_str(source));
-      return(true);
-   }
-   //xraudio_devices_input_str() returns the address of a static variable, so cannot use it twice in a single print
-   XLOGD_ERROR("Voice Session denied for source %s", xraudio_devices_input_str(source));
-   XLOGD_ERROR("Existing session still in progress on source %s", xraudio_devices_input_str(xraudio_atomic_int_get(&g_voice_session.source)));
-   return(false);
 }
 
 void xraudio_process_spkr_data(xraudio_main_thread_params_t *params, xraudio_session_playback_t *session, unsigned long frame_size, unsigned long *timeout, rdkx_timestamp_t *timestamp_sync) {
@@ -3858,18 +3951,18 @@ bool xraudio_in_capture_internal_filename_get(char *filename, const char *dir_pa
    return(true);
 }
 
-void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xraudio_input_format_t *decoded, xraudio_capture_internal_t *capture_internal, const char *stream_id) {
+void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xraudio_input_format_t *decoded, xraudio_capture_internal_t *capture_internal, xraudio_capture_instance_t *capture_instance, const char *stream_id) {
    xraudio_capture_file_t *captures[2];
-   captures[0] = &capture_internal->native;
-   captures[1] = (decoded != NULL) ? &capture_internal->decoded : NULL;
+   captures[0] = &capture_instance->native;
+   captures[1] = (decoded != NULL) ? &capture_instance->decoded : NULL;
 
-   capture_internal->active = true;
+   capture_instance->active = true;
 
-   capture_internal->native.format = *native;
+   capture_instance->native.format = *native;
    if(decoded != NULL) {
-      capture_internal->decoded.format = *decoded;
+      capture_instance->decoded.format = *decoded;
    } else {
-      capture_internal->decoded.format = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
+      capture_instance->decoded.format = (xraudio_input_format_t) { .container   = XRAUDIO_CONTAINER_INVALID,
                                                                     .encoding    = XRAUDIO_ENCODING_INVALID,
                                                                     .sample_rate = XRAUDIO_INPUT_DEFAULT_SAMPLE_RATE,
                                                                     .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
@@ -3884,28 +3977,27 @@ void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xra
       }
 
       if(!xraudio_in_capture_internal_filename_get(filename, capture_internal->dir_path, sizeof(filename), capture->format.encoding, capture_internal->file_index, stream_id)) {
-         capture_internal->active = false;
+         capture_instance->active = false;
          break;
       }
 
       // Delete file with the same index
       xraudio_capture_file_delete(capture_internal->dir_path, capture_internal->file_index);
 
-      XLOGD_INFO("%s file <%s>", (index == 0) ? "native" : "decoded", filename);
+      capture->audio_data_size    = 0;
+      capture->format.container = (capture->format.encoding == XRAUDIO_ENCODING_PCM) ? XRAUDIO_CONTAINER_WAV : XRAUDIO_CONTAINER_NONE;
+
+      XLOGD_INFO("%s file <%s> container <%s> encoding <%s> chan_qty <%u> %u Hz %u-bit", (index == 0) ? "native" : "decoded", filename, xraudio_container_str(capture->format.container), xraudio_encoding_str(capture->format.encoding), capture->format.channel_qty, capture->format.sample_rate, (capture->format.sample_size <= 2) ? capture->format.sample_size * 8 : 24 );
 
       errno = 0;
-      FILE *fh = fopen(filename, "w");
-      if(NULL == fh) {
+      capture->fh = fopen(filename, "w");
+      if(NULL == capture->fh) {
          int errsv = errno;
          XLOGD_ERROR("Unable to open file <%s> <%s>", filename, strerror(errsv));
-         capture_internal->active = false;
+         capture_instance->active = false;
          break;
       }
 
-      capture->audio_data_size    = 0;
-      capture->fh                 = fh;
-
-      capture->format.container = (capture->format.encoding == XRAUDIO_ENCODING_PCM) ? XRAUDIO_CONTAINER_WAV : XRAUDIO_CONTAINER_NONE;
       xraudio_record_container_process_begin(capture->fh, capture->format.container);
 
       capture_internal->file_index++;
@@ -3914,7 +4006,7 @@ void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xra
       }
    }
 
-   if(!capture_internal->active) {
+   if(!capture_instance->active) {
       for(uint32_t index = 0; index < 2; index++) {
          xraudio_capture_file_t *capture = captures[index];
          if(capture == NULL) {
@@ -3927,10 +4019,10 @@ void xraudio_in_capture_internal_input_begin(xraudio_input_format_t *native, xra
    }
 }
 
-void xraudio_in_capture_internal_end(xraudio_capture_internal_t *capture_internal) {
+void xraudio_in_capture_internal_end(xraudio_capture_instance_t *capture_instancce) {
    xraudio_capture_file_t *captures[2];
-   captures[0] = &capture_internal->native;
-   captures[1] = (capture_internal->decoded.format.encoding != XRAUDIO_ENCODING_INVALID) ? &capture_internal->decoded : NULL;
+   captures[0] = &capture_instancce->native;
+   captures[1] = (capture_instancce->decoded.format.encoding != XRAUDIO_ENCODING_INVALID) ? &capture_instancce->decoded : NULL;
 
    for(uint32_t index = 0; index < 2; index++) {
       xraudio_capture_file_t *capture = captures[index];
@@ -3951,7 +4043,7 @@ void xraudio_in_capture_internal_end(xraudio_capture_internal_t *capture_interna
                                                    .sample_size = XRAUDIO_INPUT_DEFAULT_SAMPLE_SIZE,
                                                    .channel_qty = XRAUDIO_INPUT_DEFAULT_CHANNEL_QTY };
    }
-   capture_internal->active = false;
+   capture_instancce->active = false;
 }
 
 void reorder_samples(uint8_t *dst_buf, uint8_t *src_buf, uint32_t data_size, uint32_t src_buf_align) {
@@ -3969,7 +4061,7 @@ void reorder_samples(uint8_t *dst_buf, uint8_t *src_buf, uint32_t data_size, uin
 int xraudio_in_capture_internal_to_file(xraudio_session_record_t *session, uint8_t *data_in, uint32_t data_size, xraudio_capture_file_t *capture_file) {
    // Check for maximum file size
    if(capture_file->audio_data_size + data_size > session->capture_internal.file_size_max) {
-      return(0);
+      return(-1);
    }
 
    if(capture_file->format.encoding == XRAUDIO_ENCODING_OPUS_XVP || capture_file->format.encoding == XRAUDIO_ENCODING_OPUS) {
@@ -3985,7 +4077,7 @@ int xraudio_in_capture_internal_to_file(xraudio_session_record_t *session, uint8
       }
    }
 
-   if(capture_file->format.channel_qty == 1 && capture_file->format.sample_size == 2) { // single channel 16-bit PCM
+   if(capture_file->format.channel_qty == 1 && capture_file->format.sample_size <= 2) { // single channel 16-bit PCM
       // Write requested size into capture file
       size_t bytes_written = fwrite(data_in, 1, data_size, capture_file->fh);
 
@@ -4194,14 +4286,18 @@ bool xraudio_hal_msg_async_handler(void *msg) {
 
    switch(header->type) {
       case XRAUDIO_MSG_TYPE_SESSION_REQUEST: {
-         if(XRAUDIO_DEVICE_INPUT_CONTAINS(g_voice_session.sources_supported, header->source)) {
-            ret = xraudio_in_session_voice_get(header->source);
+         if(!XRAUDIO_DEVICE_INPUT_CONTAINS(g_voice_session.sources_supported, header->source)) {
+            XLOGD_ERROR("requested source <%s> is not supported", xraudio_devices_input_str(header->source));
+            XLOGD_ERROR("supported sources <%s>", xraudio_devices_input_str(g_voice_session.sources_supported));
+         } else {
+            ret = xraudio_in_session_group_semaphore_lock(header->source);
          }
          break;
       }
       case XRAUDIO_MSG_TYPE_SESSION_BEGIN: {
          xraudio_hal_msg_session_begin_t *begin = (xraudio_hal_msg_session_begin_t *)msg;
-         if(xraudio_atomic_int_get(&g_voice_session.source) != begin->header.source) {
+         uint32_t group = xraudio_input_source_to_group(begin->header.source);
+         if(xraudio_in_session_group_source_get(group) != begin->header.source) {
             ret = false;
          } else {
             // Send message to queue
@@ -4217,7 +4313,8 @@ bool xraudio_hal_msg_async_handler(void *msg) {
       }
       case XRAUDIO_MSG_TYPE_SESSION_END: {
          xraudio_hal_msg_session_end_t *end = (xraudio_hal_msg_session_end_t *)msg;
-         if(xraudio_atomic_int_get(&g_voice_session.source) != end->header.source) {
+         uint32_t group = xraudio_input_source_to_group(end->header.source);
+         if(xraudio_in_session_group_source_get(group) != end->header.source) {
             ret = false;
          } else {
             // Send message to queue
@@ -4247,11 +4344,12 @@ bool xraudio_hal_msg_async_handler(void *msg) {
 }
 
 void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, xraudio_session_record_t *session, xraudio_decoders_t *decoders) {
-   xraudio_capture_file_t *capture_file = &session->capture_internal.native;
+   xraudio_session_record_inst_t *instance = &session->instances[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+   xraudio_capture_file_t *capture_file = &instance->capture_internal.native;
    int32_t bytes_read = 0;
 
    xraudio_encoding_t enc_input  = session->external_format.encoding;
-   xraudio_encoding_t enc_output = session->format_out.encoding;
+   xraudio_encoding_t enc_output = instance->format_out.encoding;
    uint8_t *inbuf = &session->external_frame_buffer[session->external_frame_group_index * session->external_frame_size_out];
    uint32_t inlen = session->external_frame_size_in;
 
@@ -4267,12 +4365,12 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             adpcm_t buffer[XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE] = {'\0'};
             bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
-               if(session->capture_internal.active) {
+               if(instance->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
                   if(rc_cap < 0) {
-                     xraudio_in_capture_internal_end(&session->capture_internal);
+                     xraudio_in_capture_internal_end(&instance->capture_internal);
                   }
-                  capture_file = &session->capture_internal.decoded;
+                  capture_file = &instance->capture_internal.decoded;
                }
                bytes_read = adpcm_decode(decoders->adpcm, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_ADPCM_SKY_FRAME_SAMPLE_QTY, command_id_min, command_id_max, false);
                if(bytes_read < 0) {
@@ -4299,12 +4397,12 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             adpcm_t buffer[XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE] = {'\0'};
             bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
-               if(session->capture_internal.active) {
+               if(instance->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
                   if(rc_cap < 0) {
-                     xraudio_in_capture_internal_end(&session->capture_internal);
+                     xraudio_in_capture_internal_end(&instance->capture_internal);
                   }
-                  capture_file = &session->capture_internal.decoded;
+                  capture_file = &instance->capture_internal.decoded;
                }
                bytes_read = adpcm_decode(decoders->adpcm, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_ADPCM_XVP_FRAME_SAMPLE_QTY, command_id_min, command_id_max, true);
                if(bytes_read < 0) {
@@ -4346,12 +4444,12 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             uint8_t buffer[XRAUDIO_INPUT_OPUS_BUFFER_SIZE] = {'\0'};
             bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_OPUS_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
-               if(session->capture_internal.active) {
+               if(instance->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
                   if(rc_cap < 0) {
-                     xraudio_in_capture_internal_end(&session->capture_internal);
+                     xraudio_in_capture_internal_end(&instance->capture_internal);
                   }
-                  capture_file = &session->capture_internal.decoded;
+                  capture_file = &instance->capture_internal.decoded;
                }
                bytes_read = xraudio_opus_decode(decoders->opus, 1, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_OPUS_FRAME_SAMPLE_QTY); // decode framed audio
                if(bytes_read < 0) {
@@ -4389,12 +4487,12 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
             uint8_t buffer[XRAUDIO_INPUT_OPUS_BUFFER_SIZE] = {'\0'};
             bytes_read = xraudio_hal_input_read(session->external_obj_hal, buffer, XRAUDIO_INPUT_OPUS_BUFFER_SIZE, NULL);
             if(bytes_read > 0) {
-               if(session->capture_internal.active) {
+               if(instance->capture_internal.active) {
                   int rc_cap = xraudio_in_capture_internal_to_file(session, buffer, (uint32_t)bytes_read, capture_file);
                   if(rc_cap < 0) {
-                     xraudio_in_capture_internal_end(&session->capture_internal);
+                     xraudio_in_capture_internal_end(&instance->capture_internal);
                   }
-                  capture_file = &session->capture_internal.decoded;
+                  capture_file = &instance->capture_internal.decoded;
                }
                bytes_read = xraudio_opus_decode(decoders->opus, 0, buffer, bytes_read, (pcm_t *)inbuf, XRAUDIO_INPUT_OPUS_FRAME_SAMPLE_QTY); // decode audio (not framed)
                if(bytes_read < 0) {
@@ -4442,30 +4540,30 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
    }
 
    if(bytes_read <= 0) {
-      if(session->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_STREAM) { // Session ended, notify
-         xraudio_in_flush(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(session->source), params, session);
+      if(instance->stream_until[0] == XRAUDIO_INPUT_RECORD_UNTIL_END_OF_STREAM) { // Session ended, notify
+         xraudio_in_flush(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(instance->source), params, session, instance);
 
          for(uint32_t index = 0; index < XRAUDIO_FIFO_QTY_MAX; index++) {
-            if(session->fifo_audio_data[index] < 0) {
+            if(instance->fifo_audio_data[index] < 0) {
                break;
             }
-            if(session->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
-               close(session->fifo_audio_data[index]);
-               session->fifo_audio_data[index] = -1;
+            if(instance->fifo_audio_data[index] >= 0) { // Close the write side of the pipe so the read side gets EOF
+               close(instance->fifo_audio_data[index]);
+               instance->fifo_audio_data[index] = -1;
             }
-            session->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
+            instance->stream_until[index] = XRAUDIO_INPUT_RECORD_UNTIL_INVALID;
          }
-         if(session->fh != NULL) {
-            xraudio_record_container_process_end(session->fh, session->external_format, session->audio_buf_index);
+         if(instance->fh != NULL) {
+            xraudio_record_container_process_end(instance->fh, session->external_format, instance->audio_buf_index);
          }
-         if(session->synchronous) {
-            if(session->semaphore == NULL) {
+         if(instance->synchronous) {
+            if(instance->semaphore == NULL) {
                XLOGD_ERROR("synchronous record with no semaphore set!");
             } else {
-               sem_post(session->semaphore);
-               session->semaphore = NULL;
+               sem_post(instance->semaphore);
+               instance->semaphore = NULL;
             }
-         } else if(session->callback != NULL){
+         } else if(instance->callback != NULL){
             switch(enc_input) {
             #ifdef XRAUDIO_DECODE_ADPCM
                case XRAUDIO_ENCODING_ADPCM_SKY: {
@@ -4480,7 +4578,7 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
                      stats.decoder_failures     = adpcm_stats.failed_decodes;
                      stats.samples_buffered_max = 0;
                   }
-                  (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_EOS, &stats, session->param);
+                  (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_EOS, &stats, instance->param);
                   break;
                }
                case XRAUDIO_ENCODING_ADPCM_XVP: {
@@ -4495,21 +4593,21 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
                      stats.decoder_failures     = adpcm_stats.failed_decodes;
                      stats.samples_buffered_max = 0;
                   }
-                  (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_EOS, &stats, session->param);
+                  (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_EOS, &stats, instance->param);
                   break;
                }
             #endif
                default: {
-                  (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_EOS, NULL, session->param);
+                  (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_EOS, NULL, instance->param);
                   break;
                }
             }
          }
          // Clear the session so no further incoming data is processed
-         session->fh                         = NULL;
-         session->audio_buf_samples          = NULL;
-         session->audio_buf_sample_qty       = 0;
-         session->audio_buf_index            = 0;
+         instance->fh                        = NULL;
+         instance->audio_buf_samples         = NULL;
+         instance->audio_buf_sample_qty      = 0;
+         instance->audio_buf_index           = 0;
          session->external_fd                = -1;
          session->external_frame_group_index = 0;
       }
@@ -4521,39 +4619,40 @@ void xraudio_process_input_external_data(xraudio_main_thread_params_t *params, x
       return;
    }
 
-   if(session->external_data_len_min           > 0                              &&
-      session->external_data_len               < session->external_data_len_min &&
-      session->external_data_len + bytes_read >= session->external_data_len_min &&
-      session->callback) {
-         (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_STREAM_TIME_MINIMUM, NULL, session->param);
+   if(instance->stream_time_min_value          > 0                               &&
+      session->external_data_len               < instance->stream_time_min_value &&
+      session->external_data_len + bytes_read >= instance->stream_time_min_value &&
+      instance->callback) {
+         (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_STREAM_TIME_MINIMUM, NULL, instance->param);
    }
 
    session->external_data_len += bytes_read;
 
-   if(session->external_keyword_end_bytes > 0 && session->external_data_len >= session->external_keyword_end_bytes) {
-      if(session->callback != NULL) {
+   if(instance->keyword_end_samples > 0 && session->external_data_len >= (instance->keyword_end_samples * sizeof(int16_t))) {
+      if(instance->callback != NULL) {
          xraudio_stream_keyword_info_t kwd_info;
-         kwd_info.byte_qty = session->external_keyword_end_bytes;
-         (*session->callback)(session->source, AUDIO_IN_CALLBACK_EVENT_STREAM_KWD_INFO, &kwd_info, session->param);
+         kwd_info.byte_qty = (instance->keyword_end_samples * sizeof(int16_t)); // 16-bit pcm
+         (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_STREAM_KWD_INFO, &kwd_info, instance->param);
       }
-      session->external_keyword_end_bytes = 0;
-      session->keyword_flush              = true;
+      instance->keyword_end_samples = 0;
+      instance->keyword_flush       = true;
    }
 
    session->external_frame_group_index++;
+
    int rc = -1;
-   if(session->record_callback) {
-      rc = session->record_callback(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(session->source), params, session);
+   if(instance->record_callback) {
+      rc = instance->record_callback(XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(instance->source), params, session, instance);
    }
 
-   if(session->capture_internal.active) {
+   if(instance->capture_internal.active) {
       int rc_cap = xraudio_in_capture_internal_to_file(session, &session->external_frame_buffer[(session->external_frame_group_index - 1) * session->external_frame_size_out], (uint32_t)bytes_read, capture_file); // Subtract 1 from frame group index because we added one for record callback
       if(rc_cap < 0) {
-         xraudio_in_capture_internal_end(&session->capture_internal);
+         xraudio_in_capture_internal_end(&instance->capture_internal);
       }
    }
 
-   if(session->external_frame_group_index >= session->frame_group_qty || (rc > 0)) {
+   if(session->external_frame_group_index >= session->external_frame_group_qty || (rc > 0)) {
       session->external_frame_group_index = 0;
       memset(session->external_frame_buffer, 0, sizeof(session->external_frame_buffer));
    }
@@ -4597,36 +4696,36 @@ bool xraudio_thread_join(xraudio_thread_t *thread) {
    return(true);
 }
 
-void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t frame_duration, uint32_t *frame_size, uint16_t stream_time_minimum, uint32_t *min_audio_data_len) {
+void xraudio_encoding_parameters_get(xraudio_input_format_t *format, uint32_t frame_duration, uint32_t *frame_size, uint16_t stream_time_min_ms, uint32_t *min_audio_data_len) {
    switch(format->encoding) {
       case XRAUDIO_ENCODING_ADPCM_XVP: {
          *frame_size         = XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE;
-         *min_audio_data_len = *frame_size * (((stream_time_minimum * 1000) + frame_duration - 1) / frame_duration); // 11.375 ms per packet
+         *min_audio_data_len = *frame_size * (((stream_time_min_ms * 1000) + frame_duration - 1) / frame_duration); // 11.375 ms per packet
          break;
       }
       case XRAUDIO_ENCODING_ADPCM_SKY: {
          *frame_size         = XRAUDIO_INPUT_ADPCM_SKY_BUFFER_SIZE - 4;
-         *min_audio_data_len = *frame_size * (((stream_time_minimum * 1000) + frame_duration - 1) / frame_duration); // 12 ms per packet
+         *min_audio_data_len = *frame_size * (((stream_time_min_ms * 1000) + frame_duration - 1) / frame_duration); // 12 ms per packet
          break;
       }
       case XRAUDIO_ENCODING_ADPCM: {
          *frame_size         = XRAUDIO_INPUT_ADPCM_XVP_BUFFER_SIZE - 4;
-         *min_audio_data_len = *frame_size * (((stream_time_minimum * 1000) + frame_duration - 1) / frame_duration); // 11.375 ms per packet
+         *min_audio_data_len = *frame_size * (((stream_time_min_ms * 1000) + frame_duration - 1) / frame_duration); // 11.375 ms per packet
          break;
       }
       case XRAUDIO_ENCODING_OPUS_XVP: {
          *frame_size         = XRAUDIO_INPUT_OPUS_BUFFER_SIZE;
-         *min_audio_data_len = *frame_size * (((stream_time_minimum * 1000) + frame_duration - 1) / frame_duration); // 20 ms per packet
+         *min_audio_data_len = *frame_size * (((stream_time_min_ms * 1000) + frame_duration - 1) / frame_duration); // 20 ms per packet
          break;
       }
       case XRAUDIO_ENCODING_OPUS: {
          *frame_size         = XRAUDIO_INPUT_OPUS_BUFFER_SIZE - 1;
-         *min_audio_data_len = *frame_size * (((stream_time_minimum * 1000) + frame_duration - 1) / frame_duration); // 20 ms per packet
+         *min_audio_data_len = *frame_size * (((stream_time_min_ms * 1000) + frame_duration - 1) / frame_duration); // 20 ms per packet
          break;
       }
       case XRAUDIO_ENCODING_PCM: {
          *frame_size         = (format->sample_rate / 1000 * format->sample_size * frame_duration) / 1000;
-         *min_audio_data_len = (format->sample_rate * format->sample_size / 1000) * stream_time_minimum;
+         *min_audio_data_len = (format->sample_rate * format->sample_size / 1000) * stream_time_min_ms;
          break;
       }
       default: {
@@ -4860,6 +4959,42 @@ int xraudio_in_capture_session_to_file_float(xraudio_capture_point_t *capture_po
    return(data_size);
 }
 #endif
+
+xraudio_devices_input_t xraudio_in_session_group_source_get(xraudio_input_session_group_t group) {
+   return(xraudio_atomic_int_get(&g_voice_session.source[group]));
+}
+
+bool xraudio_in_session_group_semaphore_lock(xraudio_devices_input_t source) {
+   uint32_t group = xraudio_input_source_to_group(source); // Select the group based on source type
+
+   if(xraudio_atomic_compare_and_set(&g_voice_session.source[group], XRAUDIO_DEVICE_INPUT_NONE, source)) {
+      XLOGD_INFO("group <%s> source <%s>", xraudio_input_session_group_str(group), xraudio_devices_input_str(source));
+      return(true);
+   }
+   //xraudio_devices_input_str() returns the address of a static variable, so cannot use it twice in a single print
+   XLOGD_ERROR("group <%s> Voice Session denied for source <%s>", xraudio_input_session_group_str(group), xraudio_devices_input_str(source));
+   XLOGD_ERROR("Existing session still in progress on source <%s>", xraudio_devices_input_str(xraudio_in_session_group_source_get(group)));
+   return(false);
+}
+
+void xraudio_in_session_group_semaphore_unlock(xraudio_thread_state_t *state, xraudio_devices_input_t source) {
+   uint32_t group = xraudio_input_source_to_group(source); // Select the group based on source type
+   xraudio_atomic_int_set(&g_voice_session.source[group], XRAUDIO_DEVICE_INPUT_NONE);
+   g_voice_session.detecting         = 1; // Used to make sure we don't close HAL when detecting stops
+   g_voice_session.sources_supported = state->record.devices_input;
+   g_voice_session.msgq              = state->params.msgq;
+   #ifdef MICROPHONE_TAP_ENABLED
+   if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(g_voice_session.sources_supported)) {
+      g_voice_session.sources_supported |= XRAUDIO_DEVICE_INPUT_MIC_TAP;
+   }
+   #endif
+
+   XLOGD_INFO("group <%s>", xraudio_input_session_group_str(group));
+}
+
+xraudio_session_record_inst_t *xraudio_in_source_to_inst(xraudio_session_record_t *session, xraudio_devices_input_t source) {
+   return(&session->instances[xraudio_input_source_to_group(source)]);
+}
 
 bool xraudio_in_aop_adjust_apply(int32_t *buffer, uint32_t sample_qty_frame, int8_t input_aop_adjust_shift) {
    int32_t *buffer_in_int32 = buffer;

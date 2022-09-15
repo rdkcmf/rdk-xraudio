@@ -87,18 +87,19 @@ typedef uint32_t xraudio_devices_input_t;
 #define XRAUDIO_DEVICE_INPUT_TRI               (0x0002)
 #define XRAUDIO_DEVICE_INPUT_QUAD              (0x0004)
 #define XRAUDIO_DEVICE_INPUT_HFP               (0x0008)
+#define XRAUDIO_DEVICE_INPUT_MIC_TAP           (0x0010)
 
 #define XRAUDIO_DEVICE_INPUT_EC_REF_NONE       (0x0000)
-#define XRAUDIO_DEVICE_INPUT_EC_REF_MONO       (0x0010)
-#define XRAUDIO_DEVICE_INPUT_EC_REF_STEREO     (0x0020)
-#define XRAUDIO_DEVICE_INPUT_EC_REF_5_1        (0x0040)
+#define XRAUDIO_DEVICE_INPUT_EC_REF_MONO       (0x0020)
+#define XRAUDIO_DEVICE_INPUT_EC_REF_STEREO     (0x0040)
+#define XRAUDIO_DEVICE_INPUT_EC_REF_5_1        (0x0080)
 
 #define XRAUDIO_DEVICE_INPUT_PTT               (0x0100)
 #define XRAUDIO_DEVICE_INPUT_FF                (0x0200)
 #define XRAUDIO_DEVICE_INPUT_INVALID           (0xFFFF)
 
-#define XRAUDIO_DEVICE_INPUT_LOCAL_GET(x)      (x & 0x000F)
-#define XRAUDIO_DEVICE_INPUT_EC_REF_GET(x)     (x & 0x00F0)
+#define XRAUDIO_DEVICE_INPUT_LOCAL_GET(x)      (x & 0x001F)
+#define XRAUDIO_DEVICE_INPUT_EC_REF_GET(x)     (x & 0x00E0)
 #define XRAUDIO_DEVICE_INPUT_EXTERNAL_GET(x)   (x & 0xFF00)
 #define XRAUDIO_DEVICE_INPUT_CONTAINS(x, y)    (x & y)
 

@@ -48,6 +48,15 @@ AC_ARG_ENABLE([resourcemgmt],
 esac],[resourcemgmt=false])
 AM_CONDITIONAL([XRAUDIO_RESOURCE_MGMT], [test x$resourcemgmt = xtrue])
 
+AC_ARG_ENABLE([mic_tap],
+[  --enable-mic_tap    Turn on Microphone Tap support],
+[case "${enableval}" in
+  yes) mic_tap=true ;;
+  no)  mic_tap=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-mic_tap]) ;;
+esac],[mic_tap=false])
+AM_CONDITIONAL([MICROPHONE_TAP_ENABLED], [test x$mic_tap = xtrue])
+
 AC_ARG_VAR(VSDK_UTILS_JSON_TO_HEADER, script to create header from json object)
 AC_ARG_VAR(VSDK_UTILS_JSON_COMBINE,   script to combine multiple json files)
 
