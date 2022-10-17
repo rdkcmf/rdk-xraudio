@@ -2571,6 +2571,8 @@ xraudio_result_t xraudio_privacy_mode_get(xraudio_object_t object, xraudio_devic
 
    if(result != XRAUDIO_RESULT_OK) {
       XLOGD_ERROR("unable to get mute state");
+   } else {
+      g_xraudio_process.privacy_mode = *enabled;
    }
 
    XRAUDIO_API_MUTEX_UNLOCK();
