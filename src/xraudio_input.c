@@ -495,7 +495,7 @@ xraudio_result_t xraudio_input_record_to_file(xraudio_input_object_t object, xra
    xraudio_input_session_t *session = xraudio_input_source_to_session(obj, source);
 
    // Close previous session if present
-   if(session->state != XRAUDIO_INPUT_STATE_IDLING) {
+   if(session->state != XRAUDIO_INPUT_STATE_IDLING && session->state != XRAUDIO_INPUT_STATE_PENDING) {
       XLOGD_ERROR("session in progress <%s>", xraudio_input_state_str(session->state));
       XRAUDIO_RECORD_MUTEX_UNLOCK();
       return(XRAUDIO_RESULT_ERROR_STATE);
@@ -581,7 +581,7 @@ xraudio_result_t xraudio_input_record_to_memory(xraudio_input_object_t object, x
    xraudio_input_session_t *session = xraudio_input_source_to_session(obj, source);
 
    // Close previous session if present
-   if(session->state != XRAUDIO_INPUT_STATE_IDLING) {
+   if(session->state != XRAUDIO_INPUT_STATE_IDLING && session->state != XRAUDIO_INPUT_STATE_PENDING) {
       XLOGD_ERROR("session in progress <%s>", xraudio_input_state_str(session->state));
       XRAUDIO_RECORD_MUTEX_UNLOCK();
       return(XRAUDIO_RESULT_ERROR_STATE);
@@ -682,7 +682,7 @@ xraudio_result_t xraudio_input_stream_to_fifo(xraudio_input_object_t object, xra
    xraudio_input_session_t *session = xraudio_input_source_to_session(obj, source);
 
    // Close previous session if present
-   if(session->state != XRAUDIO_INPUT_STATE_IDLING) {
+   if(session->state != XRAUDIO_INPUT_STATE_IDLING && session->state != XRAUDIO_INPUT_STATE_PENDING) {
       XLOGD_ERROR("session in progress <%s>", xraudio_input_state_str(session->state));
       XRAUDIO_RECORD_MUTEX_UNLOCK();
       return(XRAUDIO_RESULT_ERROR_STATE);
@@ -758,7 +758,7 @@ xraudio_result_t xraudio_input_stream_to_pipe(xraudio_input_object_t object, xra
    xraudio_input_session_t *session = xraudio_input_source_to_session(obj, source);
 
    // Close previous session if present
-   if(session->state != XRAUDIO_INPUT_STATE_IDLING) {
+   if(session->state != XRAUDIO_INPUT_STATE_IDLING && session->state != XRAUDIO_INPUT_STATE_PENDING) {
       XLOGD_ERROR("src <%s> session in progress <%s>", xraudio_devices_input_str(source), xraudio_input_state_str(session->state));
       XRAUDIO_RECORD_MUTEX_UNLOCK();
       return(XRAUDIO_RESULT_ERROR_STATE);
@@ -867,7 +867,7 @@ xraudio_result_t xraudio_input_stream_to_user(xraudio_input_object_t object, xra
    xraudio_input_session_t *session = xraudio_input_source_to_session(obj, source);
 
    // Close previous session if present
-   if(session->state != XRAUDIO_INPUT_STATE_IDLING) {
+   if(session->state != XRAUDIO_INPUT_STATE_IDLING && session->state != XRAUDIO_INPUT_STATE_PENDING) {
       XLOGD_ERROR("session in progress <%s>", xraudio_input_state_str(session->state));
       XRAUDIO_RECORD_MUTEX_UNLOCK();
       return(XRAUDIO_RESULT_ERROR_STATE);
@@ -1315,7 +1315,7 @@ xraudio_result_t xraudio_input_stop(xraudio_input_object_t object, xraudio_devic
 xraudio_result_t xraudio_input_stop_locked(xraudio_input_obj_t *obj, xraudio_devices_input_t source, int32_t index) {
    xraudio_input_session_t *session = xraudio_input_source_to_session(obj, source);
 
-   if(session->state != XRAUDIO_INPUT_STATE_RECORDING && session->state != XRAUDIO_INPUT_STATE_STREAMING) {
+   if(session->state != XRAUDIO_INPUT_STATE_RECORDING && session->state != XRAUDIO_INPUT_STATE_STREAMING && session->state != XRAUDIO_INPUT_STATE_PENDING) {
       XLOGD_ERROR("src <%s> invalid state <%s>", xraudio_devices_input_str(source), xraudio_input_state_str(session->state));
       return(XRAUDIO_RESULT_ERROR_STATE);
    }
@@ -1515,12 +1515,16 @@ xraudio_result_t xraudio_input_dispatch_record(xraudio_input_obj_t *obj, xraudio
 
 xraudio_result_t xraudio_input_dispatch_detect(xraudio_input_obj_t *obj, keyword_callback_t callback, void *param, bool synchronous) {
    xraudio_queue_msg_detect_t msg;
+   xraudio_input_session_t *session = &obj->sessions[XRAUDIO_INPUT_SESSION_GROUP_DEFAULT];
+
    msg.header.type            = XRAUDIO_MAIN_QUEUE_MSG_TYPE_DETECT;
    msg.callback               = callback;
    msg.param                  = param;
    msg.chan_qty               = obj->format_in.channel_qty;
    msg.sensitivity            = obj->detect_params.sensitivity;
    msg.semaphore              = NULL;
+
+   session->state = XRAUDIO_INPUT_STATE_PENDING;
 
    if(synchronous) { // synchronous
       sem_t semaphore;

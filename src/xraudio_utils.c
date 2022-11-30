@@ -417,6 +417,7 @@ const char *xraudio_input_state_str(xraudio_input_state_t type) {
    switch(type) {
       case XRAUDIO_INPUT_STATE_CREATED:   return("CREATED");
       case XRAUDIO_INPUT_STATE_IDLING:    return("IDLING");
+      case XRAUDIO_INPUT_STATE_PENDING:   return("PENDING");
       case XRAUDIO_INPUT_STATE_RECORDING: return("RECORDING");
       case XRAUDIO_INPUT_STATE_STREAMING: return("STREAMING");
       case XRAUDIO_INPUT_STATE_DETECTING: return("DETECTING");
