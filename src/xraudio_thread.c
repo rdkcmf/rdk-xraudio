@@ -2380,10 +2380,14 @@ void xraudio_process_mic_error(xraudio_session_record_t *session) {
             sem_post(instance->semaphore);
             instance->semaphore = NULL;
          }
-      } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) == instance->source && instance->callback != NULL) {
-         (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_ERROR, NULL, instance->param);
-      } else if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input) != XRAUDIO_DEVICE_INPUT_NONE && xraudio_keyword_detector_session_is_armed(&session->keyword_detector)) {
-         xraudio_keyword_detector_session_event(&session->keyword_detector, XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input), KEYWORD_CALLBACK_EVENT_ERROR, NULL, session->format_in);
+      } else {
+         xraudio_devices_input_t device_local = XRAUDIO_DEVICE_INPUT_LOCAL_GET(session->devices_input);
+         xraudio_devices_input_t source_local = XRAUDIO_DEVICE_INPUT_LOCAL_GET(instance->source);
+         if((instance->callback != NULL) && (device_local != XRAUDIO_DEVICE_INPUT_NONE) && (source_local != XRAUDIO_DEVICE_INPUT_NONE)) {
+            (*instance->callback)(instance->source, AUDIO_IN_CALLBACK_EVENT_ERROR, NULL, instance->param);
+         } else if(device_local != XRAUDIO_DEVICE_INPUT_NONE && xraudio_keyword_detector_session_is_armed(&session->keyword_detector)) {
+            xraudio_keyword_detector_session_event(&session->keyword_detector, device_local, KEYWORD_CALLBACK_EVENT_ERROR, NULL, session->format_in);
+         }
       }
    }
    session->recording = false;
