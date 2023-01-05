@@ -1211,7 +1211,7 @@ void xraudio_msg_record_start(xraudio_thread_state_t *state, void *msg) {
       }
       #endif
 
-      if(instance->latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL && state->record.latency_mode != instance->latency_mode) {
+      if(instance->format_out.encoding != XRAUDIO_ENCODING_PCM_RAW && instance->latency_mode != XRAUDIO_STREAM_LATENCY_NORMAL && state->record.latency_mode != instance->latency_mode) {
          if(!xraudio_hal_input_stream_latency_set(state->params.hal_input_obj, instance->latency_mode)) {
             XLOGD_ERROR("unable to set hal input latency mode <%s>", xraudio_stream_latency_mode_str(instance->latency_mode));
          }
@@ -3920,7 +3920,8 @@ bool xraudio_in_capture_internal_filename_get(char *filename, const char *dir_pa
       stream_id = "";
    }
    switch(encoding) {
-      case XRAUDIO_ENCODING_PCM: {
+      case XRAUDIO_ENCODING_PCM:
+      case XRAUDIO_ENCODING_PCM_RAW: {
          snprintf(filename, filename_size, CAPTURE_INTERNAL_FILENAME_WAV, dir_path, file_index, separator, stream_id);
          break;
       }
