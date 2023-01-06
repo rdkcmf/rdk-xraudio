@@ -2548,7 +2548,7 @@ xraudio_result_t xraudio_privacy_mode_get(xraudio_object_t object, xraudio_devic
       return(XRAUDIO_RESULT_ERROR_PARAMS);
    }
    if(XRAUDIO_DEVICE_INPUT_LOCAL_GET(input) == XRAUDIO_DEVICE_INPUT_NONE) {
-      *enabled = false;
+      *enabled = g_xraudio_process.privacy_mode;
       return(XRAUDIO_RESULT_OK);
    }
 
